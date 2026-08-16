@@ -65,9 +65,4 @@ V3 UPDATES
 ==========
 - Sales summary now shows the actual date next to Today.
 - Receipt number removed from the main Sales History table; it remains in View Sale and Excel exports.
-- Customer can be recorded as Guest or HeyNikko Member at checkout.
-- Optional member email and mobile can be saved with the transaction.
-- Join / Sign In panel includes an offline QR code and link to https://account.heynikko.com.
-- Member information appears in View Sale and the Sales Excel sheet.
-- Shopify account sign-in and marketing consent are separate: this POS does not automatically subscribe customers to marketing.
 - Existing v1/v2 local data is migrated automatically.

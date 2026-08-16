@@ -1,0 +1,89 @@
+const KEY='heynikko_pos_v1';
+const seed={products:[
+ {id:'p1',sku:'BB-ST01',name:'Baobao Sticker',price:4,stock:100,low:5},
+ {id:'p2',sku:'SN-ST01',name:'Sunny Sticker',price:4,stock:80,low:5}
+],promos:[{id:'pr1',buy:'p1',buyQty:2,gift:'p2',giftQty:1,active:true}],sales:[],movements:[],cart:[]};
+let db=load();
+function load(){try{return {...seed,...JSON.parse(localStorage.getItem(KEY)||'{}')}}catch{return structuredClone(seed)}}
+function save(){localStorage.setItem(KEY,JSON.stringify(db))}
+const $=s=>document.querySelector(s); const $$=s=>[...document.querySelectorAll(s)];
+const money=n=>new Intl.NumberFormat('en-SG',{style:'currency',currency:'SGD'}).format(Number(n)||0);
+const nowISO=()=>new Date().toISOString();
+const uid=p=>p+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),1800)}
+function prod(id){return db.products.find(p=>p.id===id)}
+function manualCart(){return db.cart.filter(i=>!i.promo)}
+function recalcPromos(){
+  const base=manualCart(); const gifts=[];
+  for(const pr of db.promos.filter(x=>x.active)){
+    const q=base.filter(i=>i.productId===pr.buy).reduce((a,b)=>a+b.qty,0);
+    const count=Math.floor(q/pr.buyQty); if(!count) continue;
+    const gp=prod(pr.gift); if(!gp) continue;
+    const wanted=count*pr.giftQty; const otherNeeded=gifts.filter(g=>g.productId===pr.gift).reduce((a,b)=>a+b.qty,0);
+    const available=Math.max(0,gp.stock-otherNeeded); const qty=Math.min(wanted,available);
+    if(qty>0) gifts.push({id:uid('c'),productId:pr.gift,qty,promo:true,promoId:pr.id});
+  }
+  db.cart=[...base,...gifts]; save(); renderCart();
+}
+function addToCart(id){const p=prod(id); if(!p||p.stock<=0)return toast('Out of stock'); let row=db.cart.find(i=>!i.promo&&i.productId===id); const current=row?.qty||0; if(current>=p.stock)return toast('Not enough stock'); if(row)row.qty++;else db.cart.push({id:uid('c'),productId:id,qty:1,promo:false}); recalcPromos()}
+function changeQty(id,d){const r=db.cart.find(i=>i.id===id);if(!r||r.promo)return;const p=prod(r.productId);r.qty=Math.max(0,Math.min(p.stock,r.qty+d));if(r.qty===0)db.cart=db.cart.filter(x=>x.id!==id);recalcPromos()}
+function renderProducts(){
+ const q=($('#search')?.value||'').toLowerCase(); const list=db.products.filter(p=>(p.name+' '+p.sku).toLowerCase().includes(q));
+ $('#productGrid').innerHTML=list.map(p=>`<button class="product-card" data-add="${p.id}"><div><strong>${esc(p.name)}</strong><div class="sku">${esc(p.sku)}</div></div><div><div class="price">${money(p.price)}</div><div class="${p.stock<=p.low?'stock-low':'muted'}">Stock: ${p.stock}</div></div></button>`).join('')||'<p class="muted">No products found.</p>';
+ $$('[data-add]').forEach(b=>b.onclick=()=>addToCart(b.dataset.add));
+}
+function renderCart(){
+ $('#cart').innerHTML=db.cart.length?db.cart.map(r=>{const p=prod(r.productId);if(!p)return'';return `<div class="cart-row"><div><strong>${esc(p.name)}</strong> ${r.promo?'<span class="promo-pill">FREE PROMO</span>':''}<div class="muted">${esc(p.sku)} · ${r.promo?'$0.00':money(p.price)}</div></div><div class="qty">${r.promo?`× ${r.qty}`:`<button class="ghost" data-minus="${r.id}">−</button><strong>${r.qty}</strong><button class="ghost" data-plus="${r.id}">+</button>`}</div></div>`}).join(''):'<p class="muted">Tap a product to start an order.</p>';
+ const total=db.cart.filter(r=>!r.promo).reduce((s,r)=>s+(prod(r.productId)?.price||0)*r.qty,0); $('#total').textContent=money(total);
+ $$('[data-minus]').forEach(b=>b.onclick=()=>changeQty(b.dataset.minus,-1));$$('[data-plus]').forEach(b=>b.onclick=()=>changeQty(b.dataset.plus,1));
+}
+function checkout(method){
+ if(!db.cart.length)return toast('Cart is empty');
+ for(const r of db.cart){const p=prod(r.productId);if(!p||r.qty>p.stock)return toast(`${p?.name||'Item'} has insufficient stock`)}
+ const sale={id:uid('S'),receipt:'HN-'+new Date().toISOString().replace(/\D/g,'').slice(2,14),createdAt:nowISO(),payment:method,total:0,items:[]};
+ for(const r of db.cart){const p=prod(r.productId);const unit=r.promo?0:p.price;sale.items.push({productId:p.id,sku:p.sku,name:p.name,qty:r.qty,unitPrice:unit,promo:r.promo});sale.total+=unit*r.qty;p.stock-=r.qty;db.movements.push({id:uid('m'),createdAt:sale.createdAt,productId:p.id,sku:p.sku,name:p.name,delta:-r.qty,reason:r.promo?'Promo sale':'Sale',receipt:sale.receipt})}
+ db.sales.unshift(sale);db.cart=[];save();renderAll();toast(`Sale completed · ${method}`)
+}
+function renderProductTable(){
+ const lows=db.products.filter(p=>p.stock<=p.low);$('#lowStockSummary').textContent=lows.length?`Low stock: ${lows.map(p=>`${p.name} (${p.stock})`).join(', ')}`:'No low-stock alerts.';
+ $('#productsTable').innerHTML=db.products.map(p=>`<tr><td>${esc(p.sku)}</td><td>${esc(p.name)}</td><td>${money(p.price)}</td><td class="${p.stock<=p.low?'stock-low':''}">${p.stock}</td><td>${p.low}</td><td><button class="ghost" data-edit="${p.id}">Edit</button> <button class="ghost" data-stock="${p.id}">Stock</button></td></tr>`).join('');
+ $$('[data-edit]').forEach(b=>b.onclick=()=>openProduct(b.dataset.edit));$$('[data-stock]').forEach(b=>b.onclick=()=>openStock(b.dataset.stock));
+}
+function openProduct(id=''){const p=id?prod(id):null;$('#productDialogTitle').textContent=p?'Edit Product':'Add Product';$('#productId').value=p?.id||'';$('#productSku').value=p?.sku||'';$('#productName').value=p?.name||'';$('#productPrice').value=p?.price??'';$('#productStock').value=p?.stock??0;$('#productLow').value=p?.low??5;$('#productDialog').showModal()}
+function saveProductForm(e){e.preventDefault();const id=$('#productId').value;const sku=$('#productSku').value.trim();if(db.products.some(p=>p.sku.toLowerCase()===sku.toLowerCase()&&p.id!==id))return toast('SKU already exists');const data={sku,name:$('#productName').value.trim(),price:+$('#productPrice').value,stock:+$('#productStock').value,low:+$('#productLow').value};if(id){const p=prod(id);const old=p.stock;Object.assign(p,data);if(old!==p.stock)db.movements.push({id:uid('m'),createdAt:nowISO(),productId:p.id,sku:p.sku,name:p.name,delta:p.stock-old,reason:'Stock edited',receipt:''})}else{const p={id:uid('p'),...data};db.products.push(p);if(p.stock)db.movements.push({id:uid('m'),createdAt:nowISO(),productId:p.id,sku:p.sku,name:p.name,delta:p.stock,reason:'Opening stock',receipt:''})}save();$('#productDialog').close();renderAll();toast('Product saved')}
+function openStock(id){const p=prod(id);$('#stockProductId').value=id;$('#stockProductName').textContent=`${p.name} · Current stock ${p.stock}`;$('#stockDelta').value='';$('#stockReason').value='';$('#stockDialog').showModal()}
+function saveStockForm(e){e.preventDefault();const p=prod($('#stockProductId').value),d=+$('#stockDelta').value;if(!p||!d)return toast('Enter a non-zero adjustment');if(p.stock+d<0)return toast('Stock cannot go below zero');p.stock+=d;db.movements.push({id:uid('m'),createdAt:nowISO(),productId:p.id,sku:p.sku,name:p.name,delta:d,reason:$('#stockReason').value.trim(),receipt:''});save();$('#stockDialog').close();recalcPromos();renderAll();toast('Stock adjusted')}
+function promoOptions(){const o=db.products.map(p=>`<option value="${p.id}">${esc(p.name)} (${esc(p.sku)})</option>`).join('');$('#promoBuy').innerHTML=o;$('#promoGift').innerHTML=o}
+function renderPromos(){
+ $('#promosTable').innerHTML=db.promos.map(pr=>{const b=prod(pr.buy),g=prod(pr.gift);return `<tr><td>${esc(b?.name||'Missing')}</td><td>${pr.buyQty}</td><td>${esc(g?.name||'Missing')}</td><td>${pr.giftQty}</td><td>${pr.active?'Active':'Off'}</td><td><button class="ghost" data-togglepromo="${pr.id}">${pr.active?'Disable':'Enable'}</button> <button class="ghost" data-delpromo="${pr.id}">Delete</button></td></tr>`}).join('')||'<tr><td colspan="6" class="muted">No promotions yet.</td></tr>';
+ $$('[data-togglepromo]').forEach(b=>b.onclick=()=>{const p=db.promos.find(x=>x.id===b.dataset.togglepromo);p.active=!p.active;save();recalcPromos();renderPromos()});$$('[data-delpromo]').forEach(b=>b.onclick=()=>{db.promos=db.promos.filter(x=>x.id!==b.dataset.delpromo);save();recalcPromos();renderPromos()});promoOptions();
+}
+function savePromoForm(e){e.preventDefault();db.promos.push({id:uid('pr'),buy:$('#promoBuy').value,buyQty:+$('#promoBuyQty').value,gift:$('#promoGift').value,giftQty:+$('#promoGiftQty').value,active:true});save();$('#promoDialog').close();recalcPromos();renderPromos();toast('Promotion added')}
+function renderSales(){const today=new Date().toDateString();const todaySales=db.sales.filter(s=>new Date(s.createdAt).toDateString()===today);$('#salesSummary').innerHTML=`<div class="stat"><div class="muted">Today</div><strong>${money(todaySales.reduce((a,b)=>a+b.total,0))}</strong></div><div class="stat"><div class="muted">Transactions</div><strong>${todaySales.length}</strong></div><div class="stat"><div class="muted">All-time</div><strong>${money(db.sales.reduce((a,b)=>a+b.total,0))}</strong></div>`;$('#salesTable').innerHTML=db.sales.map(s=>`<tr><td>${new Date(s.createdAt).toLocaleString('en-SG')}</td><td>${s.receipt}</td><td>${s.payment}</td><td>${s.items.reduce((a,b)=>a+b.qty,0)}</td><td>${money(s.total)}</td></tr>`).join('')||'<tr><td colspan="5" class="muted">No sales yet.</td></tr>'}
+function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function renderAll(){renderProducts();renderCart();renderProductTable();renderPromos();renderSales()}
+
+// Minimal XLSX writer: creates an uncompressed ZIP containing valid Office Open XML workbook files.
+const te=new TextEncoder();
+function crc32(bytes){let c=-1;for(const b of bytes){c^=b;for(let k=0;k<8;k++)c=(c>>>1)^((c&1)?0xEDB88320:0)}return(c^-1)>>>0}
+function u16(n){return [n&255,(n>>>8)&255]} function u32(n){return [n&255,(n>>>8)&255,(n>>>16)&255,(n>>>24)&255]}
+function zipStore(files){let parts=[],central=[],offset=0;for(const [name,text] of Object.entries(files)){const nb=te.encode(name),data=te.encode(text),crc=crc32(data);const local=new Uint8Array([80,75,3,4,20,0,0,0,0,0,0,0,0,0,...u32(crc),...u32(data.length),...u32(data.length),...u16(nb.length),0,0]);parts.push(local,nb,data);const cen=new Uint8Array([80,75,1,2,20,0,20,0,0,0,0,0,0,0,0,0,...u32(crc),...u32(data.length),...u32(data.length),...u16(nb.length),0,0,0,0,0,0,0,0,0,0,0,0,...u32(offset)]);central.push(cen,nb);offset+=local.length+nb.length+data.length}const centralSize=central.reduce((s,a)=>s+a.length,0),end=new Uint8Array([80,75,5,6,0,0,0,0,...u16(Object.keys(files).length),...u16(Object.keys(files).length),...u32(centralSize),...u32(offset),0,0]);return new Blob([...parts,...central,end],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})}
+function xml(s){return String(s??'').replace(/[<>&'\"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;',"'":'&apos;','"':'&quot;'}[c]))}
+function colName(n){let s='';while(n){n--;s=String.fromCharCode(65+n%26)+s;n=Math.floor(n/26)}return s}
+function sheetXml(rows){return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${rows.map((r,ri)=>`<row r="${ri+1}">${r.map((v,ci)=>{const ref=colName(ci+1)+(ri+1);if(typeof v==='number'&&Number.isFinite(v))return `<c r="${ref}"><v>${v}</v></c>`;return `<c r="${ref}" t="inlineStr"><is><t>${xml(v)}</t></is></c>`}).join('')}</row>`).join('')}</sheetData></worksheet>`}
+function workbookData(filterToday=false){const sales=filterToday?db.sales.filter(s=>new Date(s.createdAt).toDateString()===new Date().toDateString()):db.sales;return [
+ ['Sales',[['Receipt','Date/Time','Payment','Total'],...sales.map(s=>[s.receipt,new Date(s.createdAt).toLocaleString('en-SG'),s.payment,s.total])]],
+ ['Items Sold',[['Receipt','Date/Time','SKU','Product','Qty','Unit Price','Promo'],...sales.flatMap(s=>s.items.map(i=>[s.receipt,new Date(s.createdAt).toLocaleString('en-SG'),i.sku,i.name,i.qty,i.unitPrice,i.promo?'Yes':'No']))]],
+ ['Inventory',[['SKU','Product','Price','Stock','Low Stock Alert'],...db.products.map(p=>[p.sku,p.name,p.price,p.stock,p.low])]],
+ ['Promotions',[['Buy SKU','Buy Product','Buy Qty','Gift SKU','Gift Product','Gift Qty','Active'],...db.promos.map(pr=>{const b=prod(pr.buy),g=prod(pr.gift);return[b?.sku||'',b?.name||'',pr.buyQty,g?.sku||'',g?.name||'',pr.giftQty,pr.active?'Yes':'No']})]],
+ ['Stock Movements',[['Date/Time','SKU','Product','Change','Reason','Receipt'],...db.movements.map(m=>[new Date(m.createdAt).toLocaleString('en-SG'),m.sku,m.name,m.delta,m.reason,m.receipt||''])]]
+ ]}
+function exportXlsx(today=false){const sheets=workbookData(today);const files={};files['[Content_Types].xml']=`<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>${sheets.map((_,i)=>`<Override PartName="/xl/worksheets/sheet${i+1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')}</Types>`;files['_rels/.rels']=`<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`;files['xl/workbook.xml']=`<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${sheets.map((s,i)=>`<sheet name="${xml(s[0])}" sheetId="${i+1}" r:id="rId${i+1}"/>`).join('')}</sheets></workbook>`;files['xl/_rels/workbook.xml.rels']=`<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${sheets.map((_,i)=>`<Relationship Id="rId${i+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i+1}.xml"/>`).join('')}</Relationships>`;sheets.forEach((s,i)=>files[`xl/worksheets/sheet${i+1}.xml`]=sheetXml(s[1]));download(zipStore(files),`HeyNikko_POS_${today?'Today_':''}${new Date().toISOString().slice(0,10)}.xlsx`)}
+function download(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000)}
+function backup(){download(new Blob([JSON.stringify(db,null,2)],{type:'application/json'}),`HeyNikko_POS_Backup_${new Date().toISOString().slice(0,10)}.json`)}
+
+$$('.tab').forEach(b=>b.onclick=()=>{$$('.tab').forEach(x=>x.classList.remove('active'));b.classList.add('active');$$('.view').forEach(v=>v.classList.remove('active'));$(`#view-${b.dataset.view}`).classList.add('active');renderAll()});
+$('#search').oninput=renderProducts;$('#clearCart').onclick=()=>{db.cart=[];save();renderCart()};$('#payCash').onclick=()=>checkout('Cash');$('#payPaynow').onclick=()=>checkout('PayNow');$('#addProductBtn').onclick=()=>openProduct();$('#productForm').onsubmit=saveProductForm;$('#stockForm').onsubmit=saveStockForm;$('#addPromoBtn').onclick=()=>{promoOptions();$('#promoDialog').showModal()};$('#promoForm').onsubmit=savePromoForm;$('#refreshSales').onclick=renderSales;$('#exportToday').onclick=()=>exportXlsx(true);$('#exportAll').onclick=()=>exportXlsx(false);$('#backupJson').onclick=backup;$('#restoreJson').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const x=JSON.parse(await f.text());if(!x.products||!x.sales)throw 0;db=x;save();renderAll();toast('Backup restored')}catch{toast('Invalid backup file')}e.target.value=''};
+window.addEventListener('online',()=>$('#offlineBadge').textContent='Online');window.addEventListener('offline',()=>$('#offlineBadge').textContent='Offline');$('#offlineBadge').textContent=navigator.onLine?'Online · offline ready':'Offline';
+if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+renderAll();

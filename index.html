@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+  <meta name="theme-color" content="#fff7e8">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="HeyNikko POS">
+  <title>HeyNikko POS</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header>
+  <div><strong>☀️ HeyNikko POS</strong><span id="offlineBadge">Offline ready</span></div>
+  <nav>
+    <button class="tab active" data-view="pos">POS</button>
+    <button class="tab" data-view="products">Products</button>
+    <button class="tab" data-view="promos">Promos</button>
+    <button class="tab" data-view="sales">Sales</button>
+    <button class="tab" data-view="export">Export</button>
+  </nav>
+</header>
+<main>
+<section id="view-pos" class="view active">
+  <div class="pos-grid">
+    <div class="panel">
+      <div class="panel-head"><h2>Products</h2><input id="search" placeholder="Search name / SKU"></div>
+      <div id="productGrid" class="product-grid"></div>
+    </div>
+    <div class="panel cart-panel">
+      <div class="panel-head"><h2>Current Order</h2><button id="clearCart" class="ghost">Clear</button></div>
+      <div id="cart"></div>
+      <div class="totals"><span>Total</span><strong id="total">$0.00</strong></div>
+      <div class="payments"><button id="payCash" class="primary">Cash</button><button id="payPaynow" class="primary">PayNow</button></div>
+    </div>
+  </div>
+</section>
+
+<section id="view-products" class="view">
+  <div class="panel">
+    <div class="panel-head"><h2>Products & Stock</h2><button id="addProductBtn" class="primary">+ Add Product</button></div>
+    <div id="lowStockSummary" class="notice"></div>
+    <div class="table-wrap"><table><thead><tr><th>SKU</th><th>Product</th><th>Price</th><th>Stock</th><th>Low at</th><th>Actions</th></tr></thead><tbody id="productsTable"></tbody></table></div>
+  </div>
+</section>
+
+<section id="view-promos" class="view">
+  <div class="panel">
+    <div class="panel-head"><h2>Automatic Promotions</h2><button id="addPromoBtn" class="primary">+ Add Promo</button></div>
+    <p class="muted">Example: Buy 2 Baobao Stickers → get 1 Sunny Sticker free.</p>
+    <div class="table-wrap"><table><thead><tr><th>Buy</th><th>Qty</th><th>Free gift</th><th>Qty</th><th>Status</th><th></th></tr></thead><tbody id="promosTable"></tbody></table></div>
+  </div>
+</section>
+
+<section id="view-sales" class="view">
+  <div class="panel">
+    <div class="panel-head"><h2>Sales History</h2><button id="refreshSales" class="ghost">Refresh</button></div>
+    <div id="salesSummary" class="stats"></div>
+    <div class="table-wrap"><table><thead><tr><th>Date</th><th>Receipt</th><th>Payment</th><th>Items</th><th>Total</th></tr></thead><tbody id="salesTable"></tbody></table></div>
+  </div>
+</section>
+
+<section id="view-export" class="view">
+  <div class="panel export-panel">
+    <h2>Export & Backup</h2>
+    <p>Export a real Excel <strong>.xlsx</strong> workbook with Sales, Items Sold, Inventory, Promotions and Stock Movements sheets.</p>
+    <div class="export-actions">
+      <button id="exportToday" class="primary">Export Today to Excel</button>
+      <button id="exportAll" class="primary">Export All to Excel</button>
+      <button id="backupJson" class="ghost">Backup Data (.json)</button>
+      <label class="ghost file-label">Restore Backup<input id="restoreJson" type="file" accept="application/json" hidden></label>
+    </div>
+    <p class="muted">On iPad, Safari will open the Share/Downloads flow. Save the file to Files, Numbers, Excel, Drive, or AirDrop it.</p>
+  </div>
+</section>
+</main>
+
+<dialog id="productDialog"><form method="dialog" id="productForm">
+  <h3 id="productDialogTitle">Add Product</h3>
+  <input type="hidden" id="productId">
+  <label>SKU<input id="productSku" required></label>
+  <label>Product name<input id="productName" required></label>
+  <label>Price ($)<input id="productPrice" type="number" step="0.01" min="0" required></label>
+  <label>Stock<input id="productStock" type="number" step="1" min="0" required></label>
+  <label>Low-stock alert at<input id="productLow" type="number" step="1" min="0" value="5" required></label>
+  <menu><button value="cancel" class="ghost">Cancel</button><button id="saveProduct" value="default" class="primary">Save</button></menu>
+</form></dialog>
+
+<dialog id="stockDialog"><form method="dialog" id="stockForm">
+  <h3>Adjust Stock</h3><input type="hidden" id="stockProductId">
+  <p id="stockProductName"></p>
+  <label>Adjustment<input id="stockDelta" type="number" step="1" required placeholder="e.g. 10 or -2"></label>
+  <label>Reason<input id="stockReason" required placeholder="Received stock, damaged, sample…"></label>
+  <menu><button value="cancel" class="ghost">Cancel</button><button id="saveStock" value="default" class="primary">Save</button></menu>
+</form></dialog>
+
+<dialog id="promoDialog"><form method="dialog" id="promoForm">
+  <h3>Add Promotion</h3>
+  <label>Customer buys<select id="promoBuy" required></select></label>
+  <label>Buy quantity<input id="promoBuyQty" type="number" min="1" step="1" value="2" required></label>
+  <label>Free gift<select id="promoGift" required></select></label>
+  <label>Gift quantity<input id="promoGiftQty" type="number" min="1" step="1" value="1" required></label>
+  <menu><button value="cancel" class="ghost">Cancel</button><button id="savePromo" value="default" class="primary">Save</button></menu>
+</form></dialog>
+
+<div id="toast"></div>
+<script src="app.js"></script>
+</body>
+</html>

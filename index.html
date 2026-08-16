@@ -33,6 +33,24 @@
     <div class="panel cart-panel">
       <div class="panel-head"><h2>Current Order</h2><button id="clearCart" class="ghost">Clear</button></div>
       <div id="cart"></div>
+      <div class="customer-card">
+        <div class="customer-card-head"><strong>Customer</strong><span class="muted">Optional</span></div>
+        <div class="customer-type">
+          <label><input type="radio" name="customerType" value="guest" checked> Guest</label>
+          <label><input type="radio" name="customerType" value="member"> HeyNikko Member</label>
+        </div>
+        <div id="memberFields" class="member-fields" hidden>
+          <label>Email<input id="memberEmail" type="email" inputmode="email" autocomplete="email" placeholder="member@email.com"></label>
+          <label>Mobile<input id="memberPhone" type="tel" inputmode="tel" autocomplete="tel" placeholder="Optional"></label>
+        </div>
+        <details class="join-member">
+          <summary>Join / Sign In to HeyNikko</summary>
+          <div class="join-member-body">
+            <img src="icons/member-qr.png" alt="QR code to HeyNikko customer account">
+            <div><strong>Scan with customer's phone</strong><p class="muted">Opens the HeyNikko Shopify customer account page. This does not automatically opt the customer into marketing.</p><a class="link-button" href="https://account.heynikko.com" target="_blank" rel="noopener">Open account page</a></div>
+          </div>
+        </details>
+      </div>
       <div class="totals"><span>Total</span><strong id="total">$0.00</strong></div>
       <div class="payments"><button id="payCash" class="primary">Cash</button><button id="payPaynow" class="primary">PayNow</button></div>
     </div>
@@ -59,7 +77,7 @@
   <div class="panel">
     <div class="panel-head"><h2>Sales History</h2><button id="refreshSales" class="ghost">Refresh</button></div>
     <div id="salesSummary" class="stats"></div>
-    <div class="table-wrap"><table><thead><tr><th>Date</th><th>Receipt</th><th>Payment</th><th>Items</th><th>Total</th><th>Status</th><th>Actions</th></tr></thead><tbody id="salesTable"></tbody></table></div>
+    <div class="table-wrap"><table><thead><tr><th>Date</th><th>Payment</th><th>Customer</th><th>Items</th><th>Total</th><th>Status</th><th>Actions</th></tr></thead><tbody id="salesTable"></tbody></table></div>
   </div>
 </section>
 
@@ -125,6 +143,11 @@
   <input type="hidden" id="editSaleId">
   <p id="editSaleReceipt" class="muted"></p>
   <label>Payment method<select id="editSalePayment"><option>Cash</option><option>PayNow</option></select></label>
+  <label>Customer type<select id="editSaleCustomerType"><option value="guest">Guest</option><option value="member">HeyNikko Member</option></select></label>
+  <div id="editMemberFields" class="member-fields">
+    <label>Member email<input id="editMemberEmail" type="email" inputmode="email" placeholder="member@email.com"></label>
+    <label>Member mobile<input id="editMemberPhone" type="tel" inputmode="tel" placeholder="Optional"></label>
+  </div>
   <div id="editSaleItems" class="edit-sale-items"></div>
   <div class="add-sale-item">
     <select id="editAddProduct"></select>

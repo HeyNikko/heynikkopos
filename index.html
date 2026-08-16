@@ -1,6 +1,151 @@
-:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#332b22;background:#fffaf1;--card:#fff;--line:#eadfce;--accent:#f4a62a;--accent2:#fff1cd;--danger:#b44337}*{box-sizing:border-box}body{margin:0;min-height:100vh}button,input,select{font:inherit}button{cursor:pointer;border:0;border-radius:12px;padding:12px 16px;font-weight:700}.primary{background:var(--accent);color:#2e2519}.ghost{background:#f4efe7;color:#4a4034}header{position:sticky;top:0;z-index:10;background:#fff7e8;border-bottom:1px solid var(--line);padding:calc(10px + env(safe-area-inset-top)) 18px 10px;display:flex;align-items:center;justify-content:space-between;gap:16px}header>div{font-size:20px;display:flex;align-items:center;gap:10px}#offlineBadge{font-size:12px;background:#e7f5e8;padding:5px 8px;border-radius:99px;color:#32683b}nav{display:flex;gap:6px;overflow:auto}.tab{background:transparent;white-space:nowrap}.tab.active{background:var(--accent2)}main{padding:18px;max-width:1400px;margin:auto}.view{display:none}.view.active{display:block}.pos-grid{display:grid;grid-template-columns:1.3fr .9fr;gap:18px}.panel{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:18px;box-shadow:0 8px 26px rgba(74,53,24,.06)}.panel-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px}.panel h2{margin:0}.panel-head input{width:min(360px,48%)}input,select{width:100%;border:1px solid var(--line);border-radius:10px;padding:12px;background:#fff}.product-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.product-card{border:1px solid var(--line);border-radius:16px;padding:16px;background:#fffdf9;text-align:left;min-height:122px;display:flex;flex-direction:column;justify-content:space-between}.product-card:active{transform:scale(.985)}.product-card .sku,.muted{color:#817364;font-size:13px}.product-card .price{font-size:20px;font-weight:800}.stock-low{color:var(--danger);font-weight:700}.cart-panel{min-height:70vh;display:flex;flex-direction:column}.cart-row{display:grid;grid-template-columns:1fr auto;gap:10px;padding:12px 0;border-bottom:1px solid var(--line)}.cart-row .qty{display:flex;align-items:center;gap:8px}.cart-row .qty button{padding:7px 11px}.promo-pill{display:inline-block;background:#e9f6e8;color:#36733e;border-radius:99px;padding:3px 7px;font-size:11px;font-weight:800}.totals{margin-top:auto;padding:18px 0;display:flex;justify-content:space-between;font-size:24px}.payments{display:grid;grid-template-columns:1fr 1fr;gap:10px}.payments button{font-size:18px;padding:16px}.table-wrap{overflow:auto}table{width:100%;border-collapse:collapse;min-width:720px}th,td{text-align:left;padding:12px;border-bottom:1px solid var(--line)}th{font-size:12px;text-transform:uppercase;color:#76695b}.notice{padding:10px 12px;border-radius:10px;background:#fff5d9;margin:10px 0}.stats{display:flex;gap:12px;flex-wrap:wrap;margin:12px 0}.stat{background:#fff8e9;border:1px solid var(--line);padding:12px 16px;border-radius:12px}.export-panel{max-width:760px}.export-actions{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:20px 0}.file-label{display:flex;align-items:center;justify-content:center;font-weight:700;border-radius:12px;padding:12px 16px;cursor:pointer}dialog{border:0;border-radius:18px;padding:0;max-width:460px;width:calc(100% - 32px);box-shadow:0 22px 70px rgba(0,0,0,.25)}dialog::backdrop{background:rgba(0,0,0,.3)}dialog form{padding:22px}dialog h3{margin-top:0}dialog label{display:block;margin:12px 0;font-size:13px;font-weight:700}dialog menu{display:flex;justify-content:flex-end;gap:8px;padding:10px 0 0;margin:0}#toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#2f2923;color:#fff;padding:12px 16px;border-radius:12px;opacity:0;pointer-events:none;transition:.2s;z-index:99}#toast.show{opacity:1}@media(max-width:900px){header{align-items:flex-start;flex-direction:column}.pos-grid{grid-template-columns:1fr}.cart-panel{min-height:auto}.product-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:560px){main{padding:10px}.panel{padding:12px;border-radius:14px}.product-grid{grid-template-columns:1fr 1fr}.panel-head{align-items:flex-start;flex-direction:column}.panel-head input{width:100%}.export-actions{grid-template-columns:1fr}}
-.product-card{overflow:hidden;padding:0}.product-card-image{width:100%;aspect-ratio:4/3;object-fit:cover;background:#fff5dd;border-bottom:1px solid var(--line)}.product-card-info{padding:14px;display:flex;flex-direction:column;gap:4px;min-height:112px}.image-placeholder{display:flex;align-items:center;justify-content:center;font-size:30px;background:#fff5dd}.table-thumb{width:52px;height:52px;border-radius:10px;object-fit:cover;border:1px solid var(--line)}.cart-thumb{width:46px;height:46px;border-radius:10px;object-fit:cover;border:1px solid var(--line);flex:0 0 auto}.cart-product{display:flex;align-items:center;gap:10px}.action-row{display:flex;gap:6px;flex-wrap:wrap}.danger-btn{background:#f8e2de;color:#943c33}.status-pill{display:inline-block;border-radius:999px;padding:5px 8px;font-size:11px;font-weight:800}.status-pill.active{background:#e9f6e8;color:#36733e}.status-pill.voided{background:#f4e7e4;color:#8f443b}.voided-row{opacity:.62}.image-upload-row{display:grid;grid-template-columns:130px 1fr;gap:14px;align-items:center;margin-top:8px}.image-preview{width:130px;height:110px;border:1px dashed var(--line);border-radius:14px;overflow:hidden;display:flex;align-items:center;justify-content:center;background:#fffaf1;color:#817364}.image-preview img{width:100%;height:100%;object-fit:cover}.image-upload-actions{display:flex;flex-direction:column;gap:8px}.dialog-body{padding:22px}.dialog-title-row{display:flex;align-items:center;justify-content:space-between;gap:12px}.dialog-title-row h3{margin:0}.receipt-meta{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:18px 0}.receipt-meta>div{display:flex;flex-direction:column;gap:3px;background:#fff8e9;border:1px solid var(--line);border-radius:12px;padding:10px}.receipt-lines{border-top:1px solid var(--line)}.receipt-line{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}.edit-sale-items{margin:14px 0}.edit-line{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}.edit-line-name{min-width:0}.promo-edit{background:#fbfff9}.remove-mini{font-size:12px;padding:7px 9px}.add-sale-item{display:grid;grid-template-columns:1fr auto;gap:8px;margin:12px 0}.edit-sale-total{display:flex;justify-content:space-between;align-items:center;font-size:20px;padding:14px 0;border-top:1px solid var(--line)}
-@media(max-width:560px){.image-upload-row{grid-template-columns:1fr}.image-preview{width:100%;height:180px}.receipt-meta{grid-template-columns:1fr}.edit-line{grid-template-columns:auto 1fr}.edit-line .qty{grid-column:1/-1;justify-content:flex-end}}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+  <meta name="theme-color" content="#fff7e8">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="HeyNikko POS">
+  <title>HeyNikko POS</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header>
+  <div><strong>☀️ HeyNikko POS</strong><span id="offlineBadge">Offline ready</span></div>
+  <nav>
+    <button class="tab active" data-view="pos">POS</button>
+    <button class="tab" data-view="products">Products</button>
+    <button class="tab" data-view="promos">Promos</button>
+    <button class="tab" data-view="sales">Sales</button>
+    <button class="tab" data-view="export">Export</button>
+  </nav>
+</header>
+<main>
+<section id="view-pos" class="view active">
+  <div class="pos-grid">
+    <div class="panel">
+      <div class="panel-head"><h2>Products</h2><div class="product-filters"><input id="search" placeholder="Search name / SKU"><select id="categoryFilter"><option value="">All categories</option></select></div></div>
+      <div id="productGrid" class="product-grid"></div>
+    </div>
+    <div class="panel cart-panel">
+      <div class="panel-head"><h2>Current Order</h2><button id="clearCart" class="ghost">Clear</button></div>
+      <div id="cart"></div>
+      <div id="bundleDiscounts"></div><div id="subtotalRow" class="edit-sale-total discount-total" style="display:none"><span>Subtotal</span><strong id="subtotal">$0.00</strong></div><div class="totals"><span>Total</span><strong id="total">$0.00</strong></div>
+      <div class="payments"><button id="payCash" class="primary">Cash</button><button id="payPaynow" class="primary">PayNow</button></div>
+    </div>
+  </div>
+</section>
 
+<section id="view-products" class="view">
+  <div class="panel">
+    <div class="panel-head"><h2>Products & Stock</h2><button id="addProductBtn" class="primary">+ Add Product</button></div>
+    <div id="lowStockSummary" class="notice"></div>
+    <div class="table-wrap"><table><thead><tr><th>Image</th><th>SKU</th><th>Product</th><th>Category</th><th>Price</th><th>Stock</th><th>Low at</th><th>Actions</th></tr></thead><tbody id="productsTable"></tbody></table></div>
+  </div>
+</section>
 
-.product-filters{display:flex;gap:8px;width:min(560px,60%)}.product-filters select{max-width:190px}.category-pill{display:inline-block;background:#f3ede4;color:#655849;border-radius:999px;padding:3px 7px;font-size:11px;font-weight:700}.bundle-line{display:flex;justify-content:space-between;gap:12px;padding:6px 0;color:#7b5420}.discount-total{font-size:14px}.category-checks{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0 14px}.category-check{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:10px;padding:10px;background:#fffaf1;font-weight:600}.category-check input{width:auto;margin:0}@media(max-width:700px){.product-filters{width:100%;flex-direction:column}.product-filters select{max-width:none}.category-checks{grid-template-columns:1fr}}
+<section id="view-promos" class="view">
+  <div class="panel">
+    <div class="panel-head"><h2>Automatic Promotions</h2><button id="addPromoBtn" class="primary">+ Add Promo</button></div>
+    <p class="muted">Use category bundle pricing for offers such as any 5 Stickers/Postcards for $10, or keep product free-gift promotions for other campaigns.</p>
+    <div class="table-wrap"><table><thead><tr><th>Type</th><th>Applies to</th><th>Offer</th><th>Status</th><th>Actions</th></tr></thead><tbody id="promosTable"></tbody></table></div>
+  </div>
+</section>
+
+<section id="view-sales" class="view">
+  <div class="panel">
+    <div class="panel-head"><h2>Sales History</h2><button id="refreshSales" class="ghost">Refresh</button></div>
+    <div id="salesSummary" class="stats"></div>
+    <div class="table-wrap"><table><thead><tr><th>Date</th><th>Payment</th><th>Items</th><th>Total</th><th>Status</th><th>Actions</th></tr></thead><tbody id="salesTable"></tbody></table></div>
+  </div>
+</section>
+
+<section id="view-export" class="view">
+  <div class="panel export-panel">
+    <h2>Export & Backup</h2>
+    <p>Export a real Excel <strong>.xlsx</strong> workbook with Sales, Items Sold, Inventory, Promotions and Stock Movements sheets.</p>
+    <div class="export-actions">
+      <button id="exportToday" class="primary">Export Today to Excel</button>
+      <button id="exportAll" class="primary">Export All to Excel</button>
+      <button id="backupJson" class="ghost">Backup Data (.json)</button>
+      <label class="ghost file-label">Restore Backup<input id="restoreJson" type="file" accept="application/json" hidden></label>
+    </div>
+    <p class="muted">Product images are included in the JSON backup. On iPad, Safari will open the Share/Downloads flow.</p>
+  </div>
+</section>
+</main>
+
+<dialog id="productDialog"><form method="dialog" id="productForm">
+  <h3 id="productDialogTitle">Add Product</h3>
+  <input type="hidden" id="productId">
+  <label>Product image
+    <div class="image-upload-row">
+      <div id="productImagePreview" class="image-preview"><span>No image</span></div>
+      <div class="image-upload-actions">
+        <label class="ghost file-label">Choose Image<input id="productImage" type="file" accept="image/*" hidden></label>
+        <button type="button" id="removeProductImage" class="ghost">Remove Image</button>
+      </div>
+    </div>
+  </label>
+  <label>SKU<input id="productSku" required></label>
+  <label>Product name<input id="productName" required></label>
+  <label>Category<select id="productCategory" required></select></label>
+  <label>Price ($)<input id="productPrice" type="number" step="0.01" min="0" required></label>
+  <label>Stock<input id="productStock" type="number" step="1" min="0" required></label>
+  <label>Low-stock alert at<input id="productLow" type="number" step="1" min="0" value="5" required></label>
+  <menu><button value="cancel" class="ghost">Cancel</button><button id="saveProduct" value="default" class="primary">Save</button></menu>
+</form></dialog>
+
+<dialog id="stockDialog"><form method="dialog" id="stockForm">
+  <h3>Adjust Stock</h3><input type="hidden" id="stockProductId">
+  <p id="stockProductName"></p>
+  <label>Adjustment<input id="stockDelta" type="number" step="1" required placeholder="e.g. 10 or -2"></label>
+  <label>Reason<input id="stockReason" required placeholder="Received stock, damaged, sample…"></label>
+  <menu><button value="cancel" class="ghost">Cancel</button><button id="saveStock" value="default" class="primary">Save</button></menu>
+</form></dialog>
+
+<dialog id="promoDialog"><form method="dialog" id="promoForm">
+  <h3>Add Promotion</h3>
+  <label>Promotion type<select id="promoType"><option value="bundle">Category bundle price</option><option value="gift">Product free gift</option></select></label>
+  <div id="bundlePromoFields">
+    <label>Eligible categories</label>
+    <div id="promoCategoryChecks" class="category-checks"></div>
+    <label>Bundle quantity<input id="bundleQty" type="number" min="1" step="1" value="5" required></label>
+    <label>Bundle price ($)<input id="bundlePrice" type="number" min="0" step="0.01" value="10.00" required></label>
+  </div>
+  <div id="giftPromoFields" hidden>
+    <label>Customer buys<select id="promoBuy"></select></label>
+    <label>Buy quantity<input id="promoBuyQty" type="number" min="1" step="1" value="2"></label>
+    <label>Free gift<select id="promoGift"></select></label>
+    <label>Gift quantity<input id="promoGiftQty" type="number" min="1" step="1" value="1"></label>
+  </div>
+  <menu><button value="cancel" class="ghost">Cancel</button><button id="savePromo" value="default" class="primary">Save</button></menu>
+</form></dialog>
+
+<dialog id="saleViewDialog"><div class="dialog-body">
+  <div class="dialog-title-row"><h3>Sale Details</h3><button type="button" class="ghost" data-close-dialog="saleViewDialog">Close</button></div>
+  <div id="saleViewContent"></div>
+</div></dialog>
+
+<dialog id="saleEditDialog"><form method="dialog" id="saleEditForm">
+  <h3>Edit Sale</h3>
+  <input type="hidden" id="editSaleId">
+  <p id="editSaleReceipt" class="muted"></p>
+  <label>Payment method<select id="editSalePayment"><option>Cash</option><option>PayNow</option></select></label>
+  <div id="editSaleItems" class="edit-sale-items"></div>
+  <div class="add-sale-item">
+    <select id="editAddProduct"></select>
+    <button type="button" id="editAddProductBtn" class="ghost">+ Add Product</button>
+  </div>
+  <div class="edit-sale-total"><span>Updated total</span><strong id="editSaleTotal">$0.00</strong></div>
+  <p class="muted">Free promotional gifts are recalculated using your currently active promo rules. Saving automatically corrects inventory.</p>
+  <menu><button value="cancel" class="ghost">Cancel</button><button id="saveSaleEdit" value="default" class="primary">Save Changes</button></menu>
+</form></dialog>
+
+<div id="toast"></div>
+<script src="app.js"></script>
+</body>
+</html>

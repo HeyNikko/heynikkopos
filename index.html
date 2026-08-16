@@ -43,7 +43,7 @@
   <div class="panel">
     <div class="panel-head"><h2>Products & Stock</h2><button id="addProductBtn" class="primary">+ Add Product</button></div>
     <div id="lowStockSummary" class="notice"></div>
-    <div class="table-wrap"><table><thead><tr><th>SKU</th><th>Product</th><th>Price</th><th>Stock</th><th>Low at</th><th>Actions</th></tr></thead><tbody id="productsTable"></tbody></table></div>
+    <div class="table-wrap"><table><thead><tr><th>Image</th><th>SKU</th><th>Product</th><th>Price</th><th>Stock</th><th>Low at</th><th>Actions</th></tr></thead><tbody id="productsTable"></tbody></table></div>
   </div>
 </section>
 
@@ -59,7 +59,7 @@
   <div class="panel">
     <div class="panel-head"><h2>Sales History</h2><button id="refreshSales" class="ghost">Refresh</button></div>
     <div id="salesSummary" class="stats"></div>
-    <div class="table-wrap"><table><thead><tr><th>Date</th><th>Receipt</th><th>Payment</th><th>Items</th><th>Total</th></tr></thead><tbody id="salesTable"></tbody></table></div>
+    <div class="table-wrap"><table><thead><tr><th>Date</th><th>Receipt</th><th>Payment</th><th>Items</th><th>Total</th><th>Status</th><th>Actions</th></tr></thead><tbody id="salesTable"></tbody></table></div>
   </div>
 </section>
 
@@ -73,7 +73,7 @@
       <button id="backupJson" class="ghost">Backup Data (.json)</button>
       <label class="ghost file-label">Restore Backup<input id="restoreJson" type="file" accept="application/json" hidden></label>
     </div>
-    <p class="muted">On iPad, Safari will open the Share/Downloads flow. Save the file to Files, Numbers, Excel, Drive, or AirDrop it.</p>
+    <p class="muted">Product images are included in the JSON backup. On iPad, Safari will open the Share/Downloads flow.</p>
   </div>
 </section>
 </main>
@@ -81,6 +81,15 @@
 <dialog id="productDialog"><form method="dialog" id="productForm">
   <h3 id="productDialogTitle">Add Product</h3>
   <input type="hidden" id="productId">
+  <label>Product image
+    <div class="image-upload-row">
+      <div id="productImagePreview" class="image-preview"><span>No image</span></div>
+      <div class="image-upload-actions">
+        <label class="ghost file-label">Choose Image<input id="productImage" type="file" accept="image/*" hidden></label>
+        <button type="button" id="removeProductImage" class="ghost">Remove Image</button>
+      </div>
+    </div>
+  </label>
   <label>SKU<input id="productSku" required></label>
   <label>Product name<input id="productName" required></label>
   <label>Price ($)<input id="productPrice" type="number" step="0.01" min="0" required></label>
@@ -104,6 +113,26 @@
   <label>Free gift<select id="promoGift" required></select></label>
   <label>Gift quantity<input id="promoGiftQty" type="number" min="1" step="1" value="1" required></label>
   <menu><button value="cancel" class="ghost">Cancel</button><button id="savePromo" value="default" class="primary">Save</button></menu>
+</form></dialog>
+
+<dialog id="saleViewDialog"><div class="dialog-body">
+  <div class="dialog-title-row"><h3>Sale Details</h3><button type="button" class="ghost" data-close-dialog="saleViewDialog">Close</button></div>
+  <div id="saleViewContent"></div>
+</div></dialog>
+
+<dialog id="saleEditDialog"><form method="dialog" id="saleEditForm">
+  <h3>Edit Sale</h3>
+  <input type="hidden" id="editSaleId">
+  <p id="editSaleReceipt" class="muted"></p>
+  <label>Payment method<select id="editSalePayment"><option>Cash</option><option>PayNow</option></select></label>
+  <div id="editSaleItems" class="edit-sale-items"></div>
+  <div class="add-sale-item">
+    <select id="editAddProduct"></select>
+    <button type="button" id="editAddProductBtn" class="ghost">+ Add Product</button>
+  </div>
+  <div class="edit-sale-total"><span>Updated total</span><strong id="editSaleTotal">$0.00</strong></div>
+  <p class="muted">Free promotional gifts are recalculated using your currently active promo rules. Saving automatically corrects inventory.</p>
+  <menu><button value="cancel" class="ghost">Cancel</button><button id="saveSaleEdit" value="default" class="primary">Save Changes</button></menu>
 </form></dialog>
 
 <div id="toast"></div>

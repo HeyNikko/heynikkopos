@@ -1,44 +1,61 @@
-HEYNIKKO IPAD OFFLINE POS (PWA)
-================================
+HEYNIKKO IPAD OFFLINE POS (PWA) — UPDATED VERSION
+==================================================
 
-WHAT THIS IS
-A touch-friendly Progressive Web App (PWA) designed for iPad. It stores products, stock, promotions and sales locally in Safari on that iPad and continues working offline after installation/caching.
+NEW IN THIS VERSION
+-------------------
+1. Completed sales now have View, Edit and Void actions.
+2. Editing a sale automatically restores the old stock, applies the edited sale, recalculates active promo gifts, and records stock movement audit entries.
+3. Voiding a sale restores ALL items to inventory, including free promo gifts. The receipt remains in history as VOIDED instead of being permanently erased.
+4. Every product can now have its own image. Images are automatically resized/compressed on the iPad before storage.
+5. Product images appear on the POS product buttons, cart, product table and sale-edit screen.
+6. Excel export now includes sale status, edited date and voided date.
+7. JSON backup includes product images.
 
-FEATURES
-- Product / SKU setup
-- Starting stock and stock adjustments
-- Low-stock alerts
-- Automatic Buy X -> Get Y free promotions
-- Free gifts also deduct stock
-- Cash / PayNow checkout
-- Sales history and daily totals
-- Excel .xlsx export with 5 sheets: Sales, Items Sold, Inventory, Promotions, Stock Movements
-- JSON backup and restore
-- Home Screen / standalone app experience
+UPDATING YOUR GITHUB PAGES VERSION
+----------------------------------
+You do NOT need to create a new repository.
 
-IMPORTANT: HOW TO PUT IT ON AN IPAD
-A PWA must be opened from an HTTPS website for reliable installation and offline service-worker caching. Opening index.html directly from the iPad Files app is NOT the recommended deployment method.
+1. Unzip this folder.
+2. In your existing GitHub repository, upload/replace:
+   - index.html
+   - app.js
+   - styles.css
+   - sw.js
+   - README.txt (optional)
+3. Keep manifest.webmanifest and the icons folder as they are, or upload all files from this folder to replace the existing copy.
+4. Commit the changes.
+5. Wait 1–3 minutes for GitHub Pages to deploy.
+6. Open your POS URL on iPad and refresh it.
+7. If an old version remains because it was cached, fully close the Home Screen POS and Safari, reopen Safari, load the site once while online, then reopen the Home Screen POS.
 
-EASIEST DEPLOYMENT
-1. Upload the contents of this folder to any static HTTPS host, such as GitHub Pages, Netlify, Cloudflare Pages, or your own HTTPS website.
-2. On the iPad, open the resulting HTTPS URL in Safari while online.
-3. Tap Safari's Share button.
-4. Tap Add to Home Screen.
-5. Open HeyNikko POS from the Home Screen once while online so all app files are cached.
-6. You can then use the POS offline.
+PRODUCT IMAGES
+--------------
+Products > Add Product / Edit Product > Choose Image.
+The image is resized to max 700 px and stored locally with the POS data.
 
-DATA STORAGE WARNING
-The POS data is stored locally in that browser/iPad. Clearing Safari website data, deleting the site's storage, or changing to a different iPad will not automatically move the database. Use Export > Backup Data (.json) regularly. Restore that JSON file on another iPad when needed.
+Because Safari/local browser storage has a limit, use reasonably sized product photos and periodically make a JSON backup. The automatic resizing greatly reduces file size.
 
-EXCEL EXPORT ON IPAD
-Open Export > Export Today to Excel or Export All to Excel. Safari downloads a .xlsx workbook. You can save/share it using Files, Microsoft Excel, Numbers, Google Drive, AirDrop, etc.
+EDITING A COMPLETED SALE
+------------------------
+Sales > Edit.
+- Change Cash / PayNow.
+- Increase/decrease quantities.
+- Remove an item.
+- Add another product.
+- Free promo gifts recalculate automatically using currently active promotion rules.
+- Save Changes automatically corrects inventory and keeps stock movement records.
 
-TESTING ON A COMPUTER
-From this folder run:
-  python3 -m http.server 8000
-Then open:
-  http://localhost:8000
-Localhost is sufficient for desktop testing. For iPad installation use HTTPS hosting.
+VOIDING A SALE
+--------------
+Sales > Void.
+The system asks for confirmation. On confirmation:
+- all sold items return to stock;
+- all free promo items return to stock;
+- the sale remains visible as VOIDED;
+- voided sales are excluded from Today / Transactions / All-time totals;
+- the Excel export keeps the voided record for audit history.
 
-STARTER DATA
-The first launch contains sample Baobao Sticker and Sunny Sticker products plus a Buy 2 -> Get 1 promo. Edit or replace these from Products and Promos.
+BACKUP
+------
+Export > Backup Data (.json)
+Save this regularly to iCloud Drive / Files. Product images are included.

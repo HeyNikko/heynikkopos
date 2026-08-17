@@ -34,3 +34,10 @@ V6.2 CHANGES
 - Sales History: Delete permanently removes the sale row; active sales restore stock first.
 - Closed events: Delete permanently removes the event and its linked sales; any still-active sales are restored to Master Stock.
 - Create Event: Cancel closes immediately and no longer triggers required-field validation.
+
+
+V6.3 UPDATE
+- Sales History checkboxes for multi-select.
+- Select All / Clear Selection controls.
+- Delete Selected permanently removes multiple sales at once.
+- Active selected sales restore stock before deletion; voided selected sales are erased without double-restoring stock.

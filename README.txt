@@ -27,3 +27,10 @@ Data is stored locally on the iPad/browser. Keep regular JSON backups from Expor
 
 
 V6.1 FIX: Corrected blank dropdown labels/options on iPad/Safari for event category, previous-event copy, and manage-event category selectors. Offline cache version also bumped.
+
+
+V6.2 CHANGES
+- Sales History: Void restores stock but keeps a VOIDED audit row.
+- Sales History: Delete permanently removes the sale row; active sales restore stock first.
+- Closed events: Delete permanently removes the event and its linked sales; any still-active sales are restored to Master Stock.
+- Create Event: Cancel closes immediately and no longer triggers required-field validation.

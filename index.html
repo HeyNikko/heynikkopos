@@ -105,15 +105,15 @@
 
 <dialog id="eventDialog" class="wide-dialog"><form method="dialog" id="eventForm">
   <h3>Create Event</h3><label>Event name<input id="eventName" required placeholder="e.g. Pop Toy Show 2026"></label><div class="two-col"><label>Start date<input id="eventStart" type="date" required></label><label>End date<input id="eventEnd" type="date" required></label></div>
-  <div class="bulk-toolbar"><input id="eventSetupSearch" placeholder="Search product or SKU…"><select id="eventSetupCategory"></select></div>
+  <div class="bulk-toolbar"><input id="eventSetupSearch" placeholder="Search product or SKU…"><select id="eventSetupCategory" class="ios-select"><option value="">All categories</option></select></div>
   <div class="bulk-actions"><button type="button" id="selectVisibleProducts" class="ghost">Select All Visible</button><button type="button" id="clearVisibleProducts" class="ghost">Clear Visible</button><label class="ghost file-label">Import CSV (SKU,QTY)<input id="eventCsvInput" type="file" accept=".csv,text/csv" hidden></label></div>
-  <div class="copy-event-box"><select id="copyEventSelect"></select><label class="inline-check"><input id="copyEventQty" type="checkbox"> Copy starting quantities too</label><button type="button" id="copyEventBtn" class="ghost">Copy Previous Event</button></div>
+  <div class="copy-event-box"><select id="copyEventSelect" class="ios-select"><option value="">Choose a previous event…</option></select><label class="inline-check"><input id="copyEventQty" type="checkbox"> Copy starting quantities too</label><button type="button" id="copyEventBtn" class="ghost">Copy Previous Event</button></div>
   <p class="muted">Tick only products you want available at this booth. Quantities are transferred from Master Stock when the event is created. Products may be added or removed later.</p><div id="eventAllocationList" class="allocation-list bulk-list"></div>
   <menu><button value="cancel" class="ghost">Cancel</button><button value="default" class="primary">Create & Use Event</button></menu>
 </form></dialog>
 
 <dialog id="manageEventDialog" class="wide-dialog"><div class="dialog-body"><div class="dialog-title-row"><div><h3>Manage Event Products & Stock</h3><p id="manageEventName" class="muted"></p></div><button type="button" class="ghost" data-close-dialog="manageEventDialog">Close</button></div>
-  <div class="bulk-toolbar"><input id="manageSearch" placeholder="Search product or SKU…"><select id="manageCategory"></select></div>
+  <div class="bulk-toolbar"><input id="manageSearch" placeholder="Search product or SKU…"><select id="manageCategory" class="ios-select"><option value="">All categories</option></select></div>
   <div class="bulk-actions"><button type="button" id="manageSelectVisible" class="ghost">Add All Visible</button><button type="button" id="manageClearVisible" class="ghost">Remove All Visible</button><label class="ghost file-label">Import CSV (SKU,QTY)<input id="manageCsvInput" type="file" accept=".csv,text/csv" hidden></label></div>
   <p class="muted">Checkbox = product is available in this event. Quantity = desired stock currently at the booth. Reducing or removing returns unsold units to Master Stock; sold history is preserved.</p><div id="manageProductList" class="allocation-list bulk-list"></div>
   <div class="dialog-footer"><button type="button" id="saveManageEvent" class="primary">Save All Changes</button></div></div></dialog>

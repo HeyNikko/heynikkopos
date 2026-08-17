@@ -24,3 +24,6 @@ Replace index.html, app.js, styles.css, sw.js and README.txt with the V6 files. 
 
 IMPORTANT
 Data is stored locally on the iPad/browser. Keep regular JSON backups from Export & Backup.
+
+
+V6.1 FIX: Corrected blank dropdown labels/options on iPad/Safari for event category, previous-event copy, and manage-event category selectors. Offline cache version also bumped.

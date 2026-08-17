@@ -1,32 +1,27 @@
-HEYNIKKO IPAD OFFLINE POS — V4 CATEGORY BUNDLES
+HEYNIKKO IPAD OFFLINE POS — V5 EVENT INVENTORY
 
-WHAT IS NEW
-- Products now have a Category field.
-- Categories: Stickers, Sticker Sheets, Keychain, Postcard.
-- POS product screen includes a category filter.
-- Promotions now support Category Bundle Price and Product Free Gift.
-- Multiple categories can be combined in one bundle promotion.
-- Bundle discounts are shown in the cart, sale details, edited sales, and Excel export.
+WHAT CHANGED
+- Master Stock is permanent inventory not currently allocated to a booth.
+- Create an Event and enter the initial quantity of each product you are bringing.
+- Initial event allocation automatically deducts from Master Stock.
+- POS sales deduct from Event Stock, not Master Stock.
+- During an event, use + Add Event Stock. Choose either:
+  1) Transfer from Master Stock, or
+  2) New Stock Received Directly at Event.
+- Closing an event automatically returns all unsold event stock to Master Stock.
+- Closed events remain in Event History for reporting and cannot be edited accidentally.
+- Sales are tagged with the event.
+- Excel export includes Events and Event Inventory sheets.
+- Existing V4 products and sales remain compatible because the local storage key is unchanged.
 
-PRELOADED HEYNIKKO BUNDLE PROMOTIONS
-1. Stickers + Postcard: any 5 combined for $10.00.
-2. Sticker Sheets: any 3 for $18.00.
-3. Keychain: any 3 for $15.00.
-
-EXAMPLE
-2 Stickers + 3 Postcards = 5 eligible items = $10.00 total.
-10 mixed Stickers/Postcards = 2 bundles = $20.00.
-7 mixed Stickers/Postcards = first 5 for $10 + remaining 2 at their normal individual prices.
-
-IMPORTANT AFTER UPDATING FROM V3
-Your existing products will remain, but older products have no category yet. Open Products > Edit for each existing product and assign the correct Category. Once a category is assigned, the preloaded bundle promotions will apply automatically.
+RECOMMENDED WORKFLOW
+1. Add every product once in Master Stock.
+2. When inventory arrives, use Restock / Adjust on Master Stock.
+3. Before a booth, Create Event and allocate the quantities you are bringing.
+4. Use the POS while that event is selected.
+5. If more stock arrives during the booth, add it from the Event screen.
+6. At the end, Close Event. Unsold units return to Master Stock automatically.
+7. Export Current Event before closing if you want an event-specific workbook, or Export All afterward.
 
 GITHUB UPDATE
-Replace these files in your existing repository:
-- index.html
-- app.js
-- styles.css
-- sw.js
-- README.txt
-
-The local database key remains unchanged, so existing products, images, stock, and sales stay on the same iPad/browser storage.
+Replace index.html, app.js, styles.css, sw.js and README.txt in your existing repository. Commit changes and wait for GitHub Pages to redeploy.

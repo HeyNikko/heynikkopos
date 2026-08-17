@@ -1,27 +1,26 @@
-HEYNIKKO IPAD OFFLINE POS — V5 EVENT INVENTORY
+HEYNIKKO IPAD OFFLINE POS — V6 BULK EVENTS
 
-WHAT CHANGED
-- Master Stock is permanent inventory not currently allocated to a booth.
-- Create an Event and enter the initial quantity of each product you are bringing.
-- Initial event allocation automatically deducts from Master Stock.
-- POS sales deduct from Event Stock, not Master Stock.
-- During an event, use + Add Event Stock. Choose either:
-  1) Transfer from Master Stock, or
-  2) New Stock Received Directly at Event.
-- Closing an event automatically returns all unsold event stock to Master Stock.
-- Closed events remain in Event History for reporting and cannot be edited accidentally.
-- Sales are tagged with the event.
-- Excel export includes Events and Event Inventory sheets.
-- Existing V4 products and sales remain compatible because the local storage key is unchanged.
+New in V6
+- Fast event setup for large catalogues (300+ products)
+- Search and filter by category while creating events
+- Select All Visible / Clear Visible
+- Copy product selection from a previous event
+- Optionally copy previous starting quantities
+- CSV event-stock import using SKU,QTY
+- Manage Products & Stock after an event is created
+- Add or remove products from a live event
+- Bulk-edit desired event stock quantities
+- Removing a product returns unsold event stock to Master Stock while preserving sold history
+- Search/filter the current event inventory table
+- Existing V5 product, image, promo, sales and event data remains compatible
 
-RECOMMENDED WORKFLOW
-1. Add every product once in Master Stock.
-2. When inventory arrives, use Restock / Adjust on Master Stock.
-3. Before a booth, Create Event and allocate the quantities you are bringing.
-4. Use the POS while that event is selected.
-5. If more stock arrives during the booth, add it from the Event screen.
-6. At the end, Close Event. Unsold units return to Master Stock automatically.
-7. Export Current Event before closing if you want an event-specific workbook, or Export All afterward.
+CSV FORMAT
+SKU,QTY
+BB-ST01,35
+SN-ST01,20
 
-GITHUB UPDATE
-Replace index.html, app.js, styles.css, sw.js and README.txt in your existing repository. Commit changes and wait for GitHub Pages to redeploy.
+UPDATING GITHUB PAGES
+Replace index.html, app.js, styles.css, sw.js and README.txt with the V6 files. Commit the changes and allow GitHub Pages to redeploy.
+
+IMPORTANT
+Data is stored locally on the iPad/browser. Keep regular JSON backups from Export & Backup.

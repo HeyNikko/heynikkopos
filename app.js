@@ -21,7 +21,7 @@ function renderCategoryOptions(){const opts='<option value="">Select category…
 function renderEventBanner(){const e=currentEvent();$('#eventBanner').innerHTML=e?`<div><strong>📍 ${esc(e.name)}</strong><span>${fmtDate(e.start)}${e.end&&e.end!==e.start?' – '+fmtDate(e.end):''}</span></div><button class="ghost" data-goto-events>Manage Event</button>`:`<div><strong>No active event selected</strong><span>Create an event and allocate stock before taking booth sales.</span></div><button class="primary" data-create-event>+ Create Event</button>`;const ce=$('[data-create-event]');if(ce)ce.onclick=openCreateEvent;const ge=$('[data-goto-events]');if(ge)ge.onclick=()=>switchView('events')}
 function renderProducts(){const q=($('#search')?.value||'').toLowerCase(),cat=$('#categoryFilter')?.value||'',e=currentEvent();const list=db.products.filter(p=>(!e||e.activeProducts?.[p.id])&&(!cat||p.category===cat)&&(p.name+' '+p.sku+' '+p.category).toLowerCase().includes(q));$('#productGrid').innerHTML=list.map(p=>{const stock=e?availableStock(p.id):0;return`<button class="product-card" data-add="${p.id}" ${!e||stock<=0?'disabled':''}>${productImageHtml(p,'product-card-image')}<div class="product-card-info"><strong>${esc(p.name)}</strong><div><span class="category-pill">${esc(p.category||'Uncategorised')}</span></div><div class="sku">${esc(p.sku)}</div><div class="price">${money(p.price)}</div><div class="${stock<=p.low?'stock-low':'muted'}">Event stock: ${stock}</div></div></button>`}).join('')||'<p class="muted">No products found.</p>';$$('[data-add]').forEach(b=>b.onclick=()=>addToCart(b.dataset.add))}
 function renderCart(){$('#cart').innerHTML=db.cart.length?db.cart.map(r=>{const p=prod(r.productId);if(!p)return'';return`<div class="cart-row"><div class="cart-product">${productImageHtml(p,'cart-thumb')}<div><strong>${esc(p.name)}</strong> ${r.promo?'<span class="promo-pill">FREE PROMO</span>':''}<div class="muted">${esc(p.sku)} · ${r.promo?'$0.00':money(p.price)}</div></div></div><div class="qty">${r.promo?`× ${r.qty}`:`<button class="ghost" data-minus="${r.id}">−</button><strong>${r.qty}</strong><button class="ghost" data-plus="${r.id}">+</button>`}</div></div>`}).join(''):'<p class="muted">Tap a product to start an order.</p>';const pricing=calcBundlePricing(manualCart()),lines=pricing.applied.filter(a=>a.discount>0).map(a=>`<div class="bundle-line"><span>${esc(a.label)} × ${a.bundles}</span><strong>−${money(a.discount)}</strong></div>`).join('');$('#bundleDiscounts').innerHTML=lines;$('#subtotalRow').style.display=pricing.discount>0?'flex':'none';$('#subtotal').textContent=money(pricing.subtotal);$('#total').textContent=money(pricing.total);$$('[data-minus]').forEach(b=>b.onclick=()=>changeQty(b.dataset.minus,-1));$$('[data-plus]').forEach(b=>b.onclick=()=>changeQty(b.dataset.plus,1))
-  // V7.0 checkout summary: keep subtotal, promotions, total and payment area visually grouped.
+  // V7.1 checkout summary: keep subtotal, promotions, total and payment area visually grouped.
   const v70Summary = document.getElementById('cartSummary');
   if (v70Summary) {
     const subtotalValue = typeof subtotal !== 'undefined'
@@ -58,6 +58,10 @@ function renderCart(){$('#cart').innerHTML=db.cart.length?db.cart.map(r=>{const 
             <strong>−${money(discountValue)}</strong>
           </div>` : ''}
         <div class="v70-summary-divider"></div>
+        <div class="v71-quick-total">
+          <span>Payable Total</span>
+          <strong>${money(totalValue)}</strong>
+        </div>
         <div class="v70-total-row">
           <span>TOTAL</span>
           <strong>${money(totalValue)}</strong>

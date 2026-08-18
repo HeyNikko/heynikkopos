@@ -106,3 +106,12 @@ V7.0 CHECKOUT REDESIGN
 - TOTAL is larger and more prominent.
 - Cash and PayNow remain directly below the total instead of being separated by a large blank space.
 - Promotion wording is simplified for faster booth use.
+
+
+V7.1 STICKY CHECKOUT
+--------------------
+- Current Order panel now stays inside the desktop/iPad viewport while the product catalogue scrolls.
+- Cart items scroll inside the Current Order panel when the order becomes long.
+- Added a compact "Payable Total" immediately below subtotal/promotion for quick reference.
+- The large TOTAL and Cash/PayNow checkout controls remain at the bottom.
+- On narrow/mobile layouts the panel returns to normal flow for compatibility.

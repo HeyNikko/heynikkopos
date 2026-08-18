@@ -14,7 +14,7 @@
 </head>
 <body>
 <header>
-  <div><strong>☀️ HeyNikko POS</strong><span id="appVersion" class="version-badge">V6.9.1</span><span id="offlineBadge">Offline ready</span></div>
+  <div><strong>☀️ HeyNikko POS</strong><span id="appVersion" class="version-badge">V7.0</span><span id="offlineBadge">Offline ready</span></div>
   <nav>
     <button class="tab active" data-view="pos">POS</button>
     <button class="tab" data-view="events">Events</button>
@@ -32,7 +32,7 @@
       <div class="panel-head"><h2>Products</h2><div class="product-filters"><input id="search" placeholder="Search name / SKU"><select id="categoryFilter"><option value="">All categories</option></select></div></div>
       <div id="productGrid" class="product-grid"></div>
     </div>
-    <div class="panel cart-panel">
+    <div class="panel cart-panel v70-checkout-panel">
       <div class="panel-head"><h2>Current Order</h2><button id="clearCart" class="ghost">Clear</button></div>
       <div id="cart"></div>
       <div id="bundleDiscounts"></div><div id="subtotalRow" class="edit-sale-total discount-total" style="display:none"><span>Subtotal</span><strong id="subtotal">$0.00</strong></div><div class="totals"><span>Total</span><strong id="total">$0.00</strong></div>
@@ -134,4 +134,4 @@
 
 <dialog id="saleViewDialog"><div class="dialog-body"><div class="dialog-title-row"><h3>Sale Details</h3><button type="button" class="ghost" data-close-dialog="saleViewDialog">Close</button></div><div id="saleViewContent"></div></div></dialog>
 <dialog id="saleEditDialog"><form method="dialog" id="saleEditForm"><h3>Edit Sale</h3><input type="hidden" id="editSaleId"><p id="editSaleReceipt" class="muted"></p><label>Payment method<select id="editSalePayment"><option>Cash</option><option>PayNow</option></select></label><div id="editSaleItems" class="edit-sale-items"></div><div class="add-sale-item"><select id="editAddProduct"></select><button type="button" id="editAddProductBtn" class="ghost">+ Add Product</button></div><div class="edit-sale-total"><span>Updated total</span><strong id="editSaleTotal">$0.00</strong></div><p class="muted">Sales for closed events are view-only. Active-event edits automatically correct event inventory.</p><menu><button value="cancel" class="ghost">Cancel</button><button value="default" class="primary">Save Changes</button></menu></form></dialog>
-<div id="toast"></div><script src="app.js?v=6.9.1"></script></body></html>
+<div id="toast"></div><script src="app.js?v=7.0"></script></body></html>

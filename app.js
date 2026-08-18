@@ -20,7 +20,52 @@ function changeQty(id,d){const r=db.cart.find(i=>i.id===id);if(!r||r.promo)retur
 function renderCategoryOptions(){const opts='<option value="">Select category…</option>'+CATEGORIES.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');$('#productCategory').innerHTML=opts;$('#categoryFilter').innerHTML='<option value="">All categories</option>'+CATEGORIES.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');$('#promoCategoryChecks').innerHTML=CATEGORIES.map(c=>`<label class="category-check"><input type="checkbox" value="${esc(c)}"> ${esc(c)}</label>`).join('')}
 function renderEventBanner(){const e=currentEvent();$('#eventBanner').innerHTML=e?`<div><strong>📍 ${esc(e.name)}</strong><span>${fmtDate(e.start)}${e.end&&e.end!==e.start?' – '+fmtDate(e.end):''}</span></div><button class="ghost" data-goto-events>Manage Event</button>`:`<div><strong>No active event selected</strong><span>Create an event and allocate stock before taking booth sales.</span></div><button class="primary" data-create-event>+ Create Event</button>`;const ce=$('[data-create-event]');if(ce)ce.onclick=openCreateEvent;const ge=$('[data-goto-events]');if(ge)ge.onclick=()=>switchView('events')}
 function renderProducts(){const q=($('#search')?.value||'').toLowerCase(),cat=$('#categoryFilter')?.value||'',e=currentEvent();const list=db.products.filter(p=>(!e||e.activeProducts?.[p.id])&&(!cat||p.category===cat)&&(p.name+' '+p.sku+' '+p.category).toLowerCase().includes(q));$('#productGrid').innerHTML=list.map(p=>{const stock=e?availableStock(p.id):0;return`<button class="product-card" data-add="${p.id}" ${!e||stock<=0?'disabled':''}>${productImageHtml(p,'product-card-image')}<div class="product-card-info"><strong>${esc(p.name)}</strong><div><span class="category-pill">${esc(p.category||'Uncategorised')}</span></div><div class="sku">${esc(p.sku)}</div><div class="price">${money(p.price)}</div><div class="${stock<=p.low?'stock-low':'muted'}">Event stock: ${stock}</div></div></button>`}).join('')||'<p class="muted">No products found.</p>';$$('[data-add]').forEach(b=>b.onclick=()=>addToCart(b.dataset.add))}
-function renderCart(){$('#cart').innerHTML=db.cart.length?db.cart.map(r=>{const p=prod(r.productId);if(!p)return'';return`<div class="cart-row"><div class="cart-product">${productImageHtml(p,'cart-thumb')}<div><strong>${esc(p.name)}</strong> ${r.promo?'<span class="promo-pill">FREE PROMO</span>':''}<div class="muted">${esc(p.sku)} · ${r.promo?'$0.00':money(p.price)}</div></div></div><div class="qty">${r.promo?`× ${r.qty}`:`<button class="ghost" data-minus="${r.id}">−</button><strong>${r.qty}</strong><button class="ghost" data-plus="${r.id}">+</button>`}</div></div>`}).join(''):'<p class="muted">Tap a product to start an order.</p>';const pricing=calcBundlePricing(manualCart()),lines=pricing.applied.filter(a=>a.discount>0).map(a=>`<div class="bundle-line"><span>${esc(a.label)} × ${a.bundles}</span><strong>−${money(a.discount)}</strong></div>`).join('');$('#bundleDiscounts').innerHTML=lines;$('#subtotalRow').style.display=pricing.discount>0?'flex':'none';$('#subtotal').textContent=money(pricing.subtotal);$('#total').textContent=money(pricing.total);$$('[data-minus]').forEach(b=>b.onclick=()=>changeQty(b.dataset.minus,-1));$$('[data-plus]').forEach(b=>b.onclick=()=>changeQty(b.dataset.plus,1))}
+function renderCart(){$('#cart').innerHTML=db.cart.length?db.cart.map(r=>{const p=prod(r.productId);if(!p)return'';return`<div class="cart-row"><div class="cart-product">${productImageHtml(p,'cart-thumb')}<div><strong>${esc(p.name)}</strong> ${r.promo?'<span class="promo-pill">FREE PROMO</span>':''}<div class="muted">${esc(p.sku)} · ${r.promo?'$0.00':money(p.price)}</div></div></div><div class="qty">${r.promo?`× ${r.qty}`:`<button class="ghost" data-minus="${r.id}">−</button><strong>${r.qty}</strong><button class="ghost" data-plus="${r.id}">+</button>`}</div></div>`}).join(''):'<p class="muted">Tap a product to start an order.</p>';const pricing=calcBundlePricing(manualCart()),lines=pricing.applied.filter(a=>a.discount>0).map(a=>`<div class="bundle-line"><span>${esc(a.label)} × ${a.bundles}</span><strong>−${money(a.discount)}</strong></div>`).join('');$('#bundleDiscounts').innerHTML=lines;$('#subtotalRow').style.display=pricing.discount>0?'flex':'none';$('#subtotal').textContent=money(pricing.subtotal);$('#total').textContent=money(pricing.total);$$('[data-minus]').forEach(b=>b.onclick=()=>changeQty(b.dataset.minus,-1));$$('[data-plus]').forEach(b=>b.onclick=()=>changeQty(b.dataset.plus,1))
+  // V7.0 checkout summary: keep subtotal, promotions, total and payment area visually grouped.
+  const v70Summary = document.getElementById('cartSummary');
+  if (v70Summary) {
+    const subtotalValue = typeof subtotal !== 'undefined'
+      ? subtotal
+      : cart.reduce((sum, item) => {
+          const product = db.products.find(p => p.id === item.productId);
+          return sum + (product ? Number(product.price || 0) * Number(item.qty || 0) : 0);
+        }, 0);
+
+    const totalValue = typeof total !== 'undefined'
+      ? total
+      : (typeof finalTotal !== 'undefined' ? finalTotal : subtotalValue);
+
+    const discountValue = Math.max(0, subtotalValue - totalValue);
+
+    let promoLabel = 'Promotion';
+    if (typeof appliedPromos !== 'undefined' && Array.isArray(appliedPromos) && appliedPromos.length) {
+      const first = appliedPromos[0];
+      promoLabel = first.label || first.name || first.description || promoLabel;
+    } else if (discountValue > 0) {
+      promoLabel = 'Promotion applied';
+    }
+
+    v70Summary.innerHTML = `
+      <div class="v70-order-summary">
+        <div class="v70-summary-title">Order Summary</div>
+        <div class="v70-summary-row v70-subtotal-row">
+          <span>Subtotal</span>
+          <strong>${money(subtotalValue)}</strong>
+        </div>
+        ${discountValue > 0 ? `
+          <div class="v70-summary-row v70-promo-row">
+            <span><span class="v70-promo-prefix">Promotion</span><br><small>${esc(promoLabel)}</small></span>
+            <strong>−${money(discountValue)}</strong>
+          </div>` : ''}
+        <div class="v70-summary-divider"></div>
+        <div class="v70-total-row">
+          <span>TOTAL</span>
+          <strong>${money(totalValue)}</strong>
+        </div>
+      </div>`;
+  }
+
+}
 function checkout(method){const e=currentEvent();if(!e)return toast('Select an open event first');if(!db.cart.length)return toast('Cart is empty');for(const r of db.cart){const p=prod(r.productId);if(!p||r.qty>availableStock(r.productId))return toast(`${p?.name||'Item'} has insufficient event stock`)}const pricing=calcBundlePricing(manualCart()),sale={id:uid('S'),receipt:'HN-'+new Date().toISOString().replace(/\D/g,'').slice(2,14),createdAt:nowISO(),updatedAt:null,payment:method,subtotal:pricing.subtotal,bundleDiscount:pricing.discount,bundlePromos:pricing.applied,total:pricing.total,status:'active',eventId:e.id,eventName:e.name,items:[]};for(const r of db.cart){const p=prod(r.productId),unit=r.promo?0:p.price;sale.items.push({productId:p.id,sku:p.sku,name:p.name,category:p.category||'',qty:r.qty,unitPrice:unit,promo:!!r.promo,promoId:r.promoId||''});e.stock[p.id]=(e.stock[p.id]||0)-r.qty;db.movements.push({id:uid('m'),createdAt:nowISO(),productId:p.id,sku:p.sku,name:p.name,delta:-r.qty,scope:'event',eventId:e.id,eventName:e.name,reason:r.promo?'Promo gift':'Sale',receipt:sale.receipt})}db.sales.unshift(sale);db.cart=[];save();renderAll();toast(`${method} sale saved`)}
 function renderProductTable(){const lows=db.products.filter(p=>p.stock<=p.low);$('#lowStockSummary').innerHTML=renderLowStockSummary(lows);$('#productsTable').innerHTML=db.products.map(p=>`<tr><td>${productImageHtml(p,'table-thumb')}</td><td>${esc(p.sku)}</td><td>${esc(p.name)}</td><td>${esc(p.category||'—')}</td><td>${money(p.price)}</td><td class="${p.stock<=p.low?'stock-low':''}">${p.stock}</td><td>${p.low}</td><td><div class="action-row"><button class="ghost" data-edit="${p.id}">Edit</button><button class="ghost" data-stock="${p.id}">Restock / Adjust</button></div></td></tr>`).join('')||'<tr><td colspan="8" class="muted">No products.</td></tr>';$$('[data-edit]').forEach(b=>b.onclick=()=>openProduct(b.dataset.edit));$$('[data-stock]').forEach(b=>b.onclick=()=>openStock(b.dataset.stock))}
 function setImagePreview(src=''){pendingProductImage=src||'';$('#productImagePreview').innerHTML=src?`<img src="${src}" alt="Product preview">`:'<span>No image</span>';$('#removeProductImage').style.display=src?'inline-block':'none'}

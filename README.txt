@@ -94,3 +94,15 @@ V6.9.1 STABILITY FIX
 - Keeps the redesigned compact Master Stock low-stock summary.
 - Added View Low Stock / Hide Low Stock expandable list.
 - Built from the known-working V6.8 codebase, then added the low-stock UI cleanly.
+
+
+V7.0 CHECKOUT REDESIGN
+----------------------
+- Built from the stable V6.9.1 codebase.
+- Cart items scroll independently on long orders.
+- Order Summary sits immediately below the cart items.
+- Subtotal is visually secondary.
+- Promotion discount is shown in green.
+- TOTAL is larger and more prominent.
+- Cash and PayNow remain directly below the total instead of being separated by a large blank space.
+- Promotion wording is simplified for faster booth use.

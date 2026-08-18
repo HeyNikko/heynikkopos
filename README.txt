@@ -48,3 +48,10 @@ V6.4 FIXES
 - Fixed Manage Event dialog Close button not responding.
 - Root cause: obsolete event-cancel handler stopped later JavaScript initialization.
 - Added safer dialog close binding so missing UI controls do not break later handlers.
+
+
+V6.5 FIX
+- Manage Event: Add All Visible now has a direct action plus event-listener fallback.
+- Manage Event: Close uses a direct dialog close action and does not depend on app initialization.
+- Added visible V6.5 badge near the HeyNikko POS title.
+- Added cache-busting query strings to app.js/styles.css and a new service-worker cache.

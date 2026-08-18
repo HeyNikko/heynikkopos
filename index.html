@@ -10,11 +10,11 @@
   <title>HeyNikko POS</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=6.5">
 </head>
 <body>
 <header>
-  <div><strong>☀️ HeyNikko POS</strong><span id="offlineBadge">Offline ready</span></div>
+  <div><strong>☀️ HeyNikko POS</strong><span id="appVersion" class="version-badge">V6.5</span><span id="offlineBadge">Offline ready</span></div>
   <nav>
     <button class="tab active" data-view="pos">POS</button>
     <button class="tab" data-view="events">Events</button>
@@ -113,9 +113,9 @@
   <menu><button value="cancel" class="ghost">Cancel</button><button value="default" class="primary">Create & Use Event</button></menu>
 </form></dialog>
 
-<dialog id="manageEventDialog" class="wide-dialog"><div class="dialog-body"><div class="dialog-title-row"><div><h3>Manage Event Products & Stock</h3><p id="manageEventName" class="muted"></p></div><button type="button" class="ghost" data-close-dialog="manageEventDialog">Close</button></div>
+<dialog id="manageEventDialog" class="wide-dialog"><div class="dialog-body"><div class="dialog-title-row"><div><h3>Manage Event Products & Stock</h3><p id="manageEventName" class="muted"></p></div><button type="button" class="ghost" id="manageDialogClose" onclick="document.getElementById('manageEventDialog').close(); return false;">Close</button></div>
   <div class="bulk-toolbar"><input id="manageSearch" placeholder="Search product or SKU…"><select id="manageCategory" class="ios-select"><option value="">All categories</option></select></div>
-  <div class="bulk-actions"><button type="button" id="manageSelectVisible" class="ghost">Add All Visible</button><button type="button" id="manageClearVisible" class="ghost">Remove All Visible</button><label class="ghost file-label">Import CSV (SKU,QTY)<input id="manageCsvInput" type="file" accept=".csv,text/csv" hidden></label></div>
+  <div class="bulk-actions"><button type="button" id="manageSelectVisible" class="ghost" onclick="manageAddAllVisible(); return false;">Add All Visible</button><button type="button" id="manageClearVisible" class="ghost" onclick="manageRemoveAllVisible(); return false;">Remove All Visible</button><label class="ghost file-label">Import CSV (SKU,QTY)<input id="manageCsvInput" type="file" accept=".csv,text/csv" hidden></label></div>
   <p class="muted">Checkbox = product is available in this event. Quantity = desired stock currently at the booth. Reducing or removing returns unsold units to Master Stock; sold history is preserved.</p><div id="manageProductList" class="allocation-list bulk-list"></div>
   <div class="dialog-footer"><button type="button" id="saveManageEvent" class="primary">Save All Changes</button></div></div></dialog>
 
@@ -134,4 +134,4 @@
 
 <dialog id="saleViewDialog"><div class="dialog-body"><div class="dialog-title-row"><h3>Sale Details</h3><button type="button" class="ghost" data-close-dialog="saleViewDialog">Close</button></div><div id="saleViewContent"></div></div></dialog>
 <dialog id="saleEditDialog"><form method="dialog" id="saleEditForm"><h3>Edit Sale</h3><input type="hidden" id="editSaleId"><p id="editSaleReceipt" class="muted"></p><label>Payment method<select id="editSalePayment"><option>Cash</option><option>PayNow</option></select></label><div id="editSaleItems" class="edit-sale-items"></div><div class="add-sale-item"><select id="editAddProduct"></select><button type="button" id="editAddProductBtn" class="ghost">+ Add Product</button></div><div class="edit-sale-total"><span>Updated total</span><strong id="editSaleTotal">$0.00</strong></div><p class="muted">Sales for closed events are view-only. Active-event edits automatically correct event inventory.</p><menu><button value="cancel" class="ghost">Cancel</button><button value="default" class="primary">Save Changes</button></menu></form></dialog>
-<div id="toast"></div><script src="app.js"></script></body></html>
+<div id="toast"></div><script src="app.js?v=6.5"></script></body></html>

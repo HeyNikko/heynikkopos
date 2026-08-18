@@ -115,3 +115,12 @@ V7.1 STICKY CHECKOUT
 - Added a compact "Payable Total" immediately below subtotal/promotion for quick reference.
 - The large TOTAL and Cash/PayNow checkout controls remain at the bottom.
 - On narrow/mobile layouts the panel returns to normal flow for compatibility.
+
+
+V7.2 CATEGORY BUTTONS
+---------------------
+- Replaced the POS product category dropdown with touch-friendly category buttons.
+- Buttons include All plus every configured product category.
+- Search and category buttons remain sticky at the top of the Products panel while scrolling.
+- Category buttons scroll horizontally if more categories are added later.
+- The original hidden select remains underneath for compatibility with the existing filter logic.

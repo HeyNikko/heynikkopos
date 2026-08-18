@@ -61,3 +61,13 @@ V6.6 FIX
 - Manage Event Close now uses native HTML dialog submission; it does not depend on app.js.
 - Add All Visible directly toggles all checkboxes currently rendered by the active search/category filter.
 - Remove All Visible uses the same direct DOM mechanism.
+
+
+V6.7 CHANGES
+-------------
+- Added "Use Master Qty" in Manage Event Products & Stock.
+  Select products, then tap this to copy each selected product's current Master Stock into its event quantity.
+- Added "Set Qty".
+  Enter one quantity and apply it to all selected visible products. The amount is capped at each product's available Master Stock.
+- Individual event quantity boxes remain editable after either bulk action.
+- Both bulk actions respect the current search/category filter and only act on selected visible products.

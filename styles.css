@@ -14,3 +14,5 @@ select,select.ios-select{color:#332b22!important;-webkit-text-fill-color:#332b22
 .sales-bulk-bar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:8px 0 12px;flex-wrap:wrap}.sales-bulk-bar>div{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.sales-check{width:20px;height:20px;margin:0;accent-color:#f4a62a}.select-col{width:42px;text-align:center}.sales-bulk-bar .danger-btn:disabled{opacity:.45;cursor:not-allowed}@media(max-width:700px){.sales-bulk-bar{align-items:stretch}.sales-bulk-bar>div{width:100%}.sales-bulk-bar>.danger-btn{width:100%}}
 
 .version-badge{font-size:11px;font-weight:800;padding:3px 7px;border-radius:999px;background:#fff0bf;color:#6f4a00;margin-left:8px}
+
+#useMasterQtyBtn,#setQtyBtn{font-weight:700}

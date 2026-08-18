@@ -55,3 +55,9 @@ V6.5 FIX
 - Manage Event: Close uses a direct dialog close action and does not depend on app initialization.
 - Added visible V6.5 badge near the HeyNikko POS title.
 - Added cache-busting query strings to app.js/styles.css and a new service-worker cache.
+
+
+V6.6 FIX
+- Manage Event Close now uses native HTML dialog submission; it does not depend on app.js.
+- Add All Visible directly toggles all checkboxes currently rendered by the active search/category filter.
+- Remove All Visible uses the same direct DOM mechanism.

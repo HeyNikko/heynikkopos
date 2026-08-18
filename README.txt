@@ -41,3 +41,10 @@ V6.3 UPDATE
 - Select All / Clear Selection controls.
 - Delete Selected permanently removes multiple sales at once.
 - Active selected sales restore stock before deletion; voided selected sales are erased without double-restoring stock.
+
+
+V6.4 FIXES
+- Fixed Manage Event > Add All Visible not responding.
+- Fixed Manage Event dialog Close button not responding.
+- Root cause: obsolete event-cancel handler stopped later JavaScript initialization.
+- Added safer dialog close binding so missing UI controls do not break later handlers.

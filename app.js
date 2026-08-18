@@ -103,97 +103,84 @@ function exportXlsx(mode='all'){if(mode==='event'&&!currentEvent())return toast(
 renderCategoryOptions();$$('.tab').forEach(b=>b.onclick=()=>switchView(b.dataset.view));$('#search').oninput=renderProducts;$('#categoryFilter').onchange=renderProducts;$('#clearCart').onclick=()=>{db.cart=[];save();renderCart()};$('#payCash').onclick=()=>checkout('Cash');$('#payPaynow').onclick=()=>checkout('PayNow');$('#addProductBtn').onclick=()=>openProduct();$('#productForm').onsubmit=saveProductForm;$('#productImage').onchange=handleProductImage;$('#removeProductImage').onclick=()=>{setImagePreview('');$('#productImage').value=''};$('#stockForm').onsubmit=saveStockForm;$('#createEventBtn').onclick=openCreateEvent;$('#eventForm').onsubmit=saveEventForm;const cancelEventCreate=$('#cancelEventCreate');if(cancelEventCreate)cancelEventCreate.onclick=()=>$('#eventDialog').close();$('#eventSetupSearch').oninput=e=>{eventDraft.search=e.target.value;renderEventDraft()};$('#eventSetupCategory').onchange=e=>{eventDraft.category=e.target.value;renderEventDraft()};$('#selectVisibleProducts').onclick=()=>setDraftVisible(true);$('#clearVisibleProducts').onclick=()=>setDraftVisible(false);$('#copyEventBtn').onclick=copyPreviousEvent;$('#eventCsvInput').onchange=e=>{importEventCsv(e.target.files[0],'create');e.target.value=''};$('#eventStockForm').onsubmit=saveEventStock;$('#manageSearch').oninput=e=>{manageDraft.search=e.target.value;renderManageDraft()};$('#manageCategory').onchange=e=>{manageDraft.category=e.target.value;renderManageDraft()};$('#manageCsvInput').onchange=e=>{importEventCsv(e.target.files[0],'manage');e.target.value=''};$('#saveManageEvent').onclick=saveManageEvent;$('#addPromoBtn').onclick=openPromo;$('#promoType').onchange=togglePromoFields;$('#promoForm').onsubmit=savePromoForm;$('#refreshSales').onclick=renderSales;$('#selectAllSales').onclick=()=>{selectedSaleIds=new Set(db.sales.map(s=>s.id));renderSales()};$('#clearSalesSelection').onclick=()=>{selectedSaleIds.clear();renderSales()};$('#deleteSelectedSales').onclick=bulkDeleteSelectedSales;$('#salesHeaderCheck').onchange=e=>{selectedSaleIds=e.target.checked?new Set(db.sales.map(s=>s.id)):new Set();renderSales()};$('#saleEditForm').onsubmit=saveSaleEditForm;$('#editAddProductBtn').onclick=addProductToEdit;$$('[data-close-dialog]').forEach(b=>b.onclick=()=>{const d=$('#'+b.dataset.closeDialog);if(d&&d.open)d.close()});$('#exportToday').onclick=()=>exportXlsx('today');$('#exportEvent').onclick=()=>exportXlsx('event');$('#exportAll').onclick=()=>exportXlsx('all');$('#backupJson').onclick=backup;$('#restoreJson').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const x=JSON.parse(await f.text());if(!x.products||!x.sales)throw 0;localStorage.setItem(KEY,JSON.stringify(x));db=load();renderAll();toast('Backup restored')}catch{toast('Invalid backup file')}e.target.value=''};document.addEventListener('click',e=>{if(e.target.matches('[data-open-pos]'))switchView('pos');if(e.target.matches('[data-close-current]')&&currentEvent())closeEvent(currentEvent().id);if(e.target.matches('[data-delete-event]'))deletePastEvent(e.target.dataset.deleteEvent)});window.addEventListener('online',()=>$('#offlineBadge').textContent='Online · offline ready');window.addEventListener('offline',()=>$('#offlineBadge').textContent='Offline');$('#offlineBadge').textContent=navigator.onLine?'Online · offline ready':'Offline';if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));renderAll();
 
 
-(function(){
-  function getManageDialog(){
+
+
+
+(function () {
+  function getManageDialogV68() {
     return document.getElementById('manageEventDialog') ||
-           document.querySelector('dialog[open]') ||
-           document.querySelector('dialog');
+      Array.from(document.querySelectorAll('dialog')).find(d => d.open) ||
+      document.querySelector('dialog[open]');
   }
 
-  function getVisibleProductRows(){
-    const dialog = getManageDialog();
+  function getVisibleManageRowsV68() {
+    const dialog = getManageDialogV68();
     if (!dialog) return [];
-    const rows = Array.from(dialog.querySelectorAll('.event-product-row, .bulk-product-row, [data-product-id]'));
-    return rows.filter(row => {
-      const style = window.getComputedStyle(row);
-      return style.display !== 'none' && style.visibility !== 'hidden';
+    const inputs = Array.from(dialog.querySelectorAll('input[type="number"]'));
+    return inputs.map(input => {
+      let row = input.closest('[data-product-id], .event-product-row, .bulk-product-row, .product-row, li, tr');
+      if (!row) {
+        row = input.parentElement;
+        while (row && row !== dialog) {
+          if (row.querySelector && row.querySelector('input[type="checkbox"]')) break;
+          row = row.parentElement;
+        }
+      }
+      return row && row !== dialog ? row : null;
+    }).filter(Boolean).filter((row, i, arr) => arr.indexOf(row) === i).filter(row => {
+      const s = window.getComputedStyle(row);
+      return s.display !== 'none' && s.visibility !== 'hidden' && row.getClientRects().length > 0;
     });
   }
 
-  function rowCheckbox(row){
-    return row.querySelector('input[type="checkbox"]');
-  }
-
-  function rowQtyInput(row){
-    return row.querySelector('input[type="number"]');
-  }
-
-  function parseMasterFromRow(row){
-    if (row.dataset && row.dataset.masterStock != null && row.dataset.masterStock !== '') {
-      const n = Number(row.dataset.masterStock);
-      if (Number.isFinite(n)) return Math.max(0, Math.floor(n));
+  function masterQtyFromRowV68(row) {
+    const explicit = row.getAttribute('data-master-stock') || row.dataset?.masterStock;
+    if (explicit !== undefined && explicit !== null && explicit !== '') {
+      const n = parseInt(explicit, 10);
+      if (Number.isFinite(n)) return Math.max(0, n);
     }
-    const text = row.innerText || row.textContent || '';
-    let m = text.match(/Master\s*(\d+)/i);
-    if (m) return Number(m[1]);
-    m = text.match(/Master\s*[:\-]?\s*(\d+)/i);
-    if (m) return Number(m[1]);
-    return 0;
+    const text = (row.innerText || row.textContent || '').replace(/\s+/g, ' ');
+    const match = text.match(/Master\s*[:\-]?\s*(\d+)/i);
+    return match ? Math.max(0, parseInt(match[1], 10)) : 0;
   }
 
-  window.useMasterQtyForVisible = function(){
-    const rows = getVisibleProductRows();
+  window.useMasterQtyForVisible = function () {
+    const rows = getVisibleManageRowsV68();
+    let selected = 0;
     let changed = 0;
+
     rows.forEach(row => {
-      const cb = rowCheckbox(row);
-      const qty = rowQtyInput(row);
-      if (!cb || !qty || !cb.checked) return;
-      const master = parseMasterFromRow(row);
-      qty.value = master;
-      qty.dispatchEvent(new Event('input', {bubbles:true}));
-      qty.dispatchEvent(new Event('change', {bubbles:true}));
+      const checkbox = row.querySelector('input[type="checkbox"]');
+      const qtyInput = row.querySelector('input[type="number"]');
+      if (!checkbox || !qtyInput || !checkbox.checked) return;
+
+      selected++;
+      const masterQty = masterQtyFromRowV68(row);
+      qtyInput.value = String(masterQty);
+
+      // Keep app state in sync with whatever existing handlers are listening for.
+      ['input', 'change'].forEach(type => {
+        qtyInput.dispatchEvent(new Event(type, { bubbles: true }));
+      });
       changed++;
     });
-    if (typeof window.showToast === 'function') {
-      window.showToast(changed ? `${changed} selected products set to Master quantity.` : 'Select products first.');
-    }
-  };
 
-  window.setQtyForVisible = function(){
-    const raw = window.prompt('Set quantity for selected visible products:');
-    if (raw === null) return;
-    let wanted = Number(raw);
-    if (!Number.isFinite(wanted) || wanted < 0) {
-      alert('Please enter a valid quantity of 0 or more.');
+    if (!selected) {
+      alert('Select the products first, then tap Use Master Qty.');
       return;
     }
-    wanted = Math.floor(wanted);
-    const rows = getVisibleProductRows();
-    let changed = 0;
-    rows.forEach(row => {
-      const cb = rowCheckbox(row);
-      const qty = rowQtyInput(row);
-      if (!cb || !qty || !cb.checked) return;
-      const master = parseMasterFromRow(row);
-      qty.value = Math.min(wanted, master);
-      qty.dispatchEvent(new Event('input', {bubbles:true}));
-      qty.dispatchEvent(new Event('change', {bubbles:true}));
-      changed++;
-    });
+
     if (typeof window.showToast === 'function') {
-      window.showToast(changed ? `${changed} selected products updated.` : 'Select products first.');
+      window.showToast(`${changed} selected products set to Master quantity.`);
     }
   };
 
-  document.addEventListener('click', function(e){
-    const t = e.target;
-    if (!t) return;
-    if (t.id === 'useMasterQtyBtn') {
-      e.preventDefault();
-      window.useMasterQtyForVisible();
-    } else if (t.id === 'setQtyBtn') {
-      e.preventDefault();
-      window.setQtyForVisible();
-    }
-  });
+  // Capture phase means this still works even if another handler stops bubbling.
+  document.addEventListener('click', function (event) {
+    const button = event.target.closest && event.target.closest('#useMasterQtyBtn');
+    if (!button) return;
+    event.preventDefault();
+    event.stopPropagation();
+    window.useMasterQtyForVisible();
+  }, true);
 })();

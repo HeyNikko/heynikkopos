@@ -71,3 +71,17 @@ V6.7 CHANGES
   Enter one quantity and apply it to all selected visible products. The amount is capped at each product's available Master Stock.
 - Individual event quantity boxes remain editable after either bulk action.
 - Both bulk actions respect the current search/category filter and only act on selected visible products.
+
+
+V6.8 CHANGES
+-------------
+- Fixed "Use Master Qty" in Manage Event Products & Stock.
+- It now reads the Master quantity directly from each selected visible product row
+  and fills the event quantity box with that exact amount.
+- Removed "Set Qty" because individual quantity boxes already allow manual adjustment.
+- Recommended workflow:
+  1. Filter/search products if needed.
+  2. Tap Add All Visible.
+  3. Tap Use Master Qty.
+  4. Manually amend only the individual quantities that differ.
+  5. Tap Save All Changes.

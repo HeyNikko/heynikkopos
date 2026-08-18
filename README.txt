@@ -87,11 +87,10 @@ V6.8 CHANGES
   5. Tap Save All Changes.
 
 
-V6.9 CHANGES
--------------
-- Redesigned the Master Stock low-stock warning.
-- Replaced the long product-name paragraph with a compact summary card.
-- Shows the number of low-stock SKUs plus a short preview.
-- Added View Low Stock / Hide Low Stock to expand a clean scrollable list.
-- Expanded list shows product name, SKU, available quantity and low-stock threshold.
-- No-stock-warning state is also cleaner.
+V6.9.1 STABILITY FIX
+--------------------
+- Fixed the JavaScript syntax error introduced in V6.9.
+- Restored POS products, navigation, buttons, event tools and checkout interactions.
+- Keeps the redesigned compact Master Stock low-stock summary.
+- Added View Low Stock / Hide Low Stock expandable list.
+- Built from the known-working V6.8 codebase, then added the low-stock UI cleanly.

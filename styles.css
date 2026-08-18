@@ -38,8 +38,4 @@ select,select.ios-select{color:#332b22!important;-webkit-text-fill-color:#332b22
 .low-stock-numbers span{display:flex;flex-direction:column}
 .low-stock-numbers small{font-size:10px;color:#8a7b6c;text-transform:uppercase}
 .low-stock-numbers strong{font-size:15px}
-@media(max-width:700px){
-  .stock-alert-main{flex-wrap:wrap}
-  .stock-alert-button{width:100%}
-  .low-stock-preview{display:none}
-}
+@media(max-width:700px){.stock-alert-main{flex-wrap:wrap}.stock-alert-button{width:100%}.low-stock-preview{display:none}}

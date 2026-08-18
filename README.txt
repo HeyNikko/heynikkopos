@@ -85,3 +85,13 @@ V6.8 CHANGES
   3. Tap Use Master Qty.
   4. Manually amend only the individual quantities that differ.
   5. Tap Save All Changes.
+
+
+V6.9 CHANGES
+-------------
+- Redesigned the Master Stock low-stock warning.
+- Replaced the long product-name paragraph with a compact summary card.
+- Shows the number of low-stock SKUs plus a short preview.
+- Added View Low Stock / Hide Low Stock to expand a clean scrollable list.
+- Expanded list shows product name, SKU, available quantity and low-stock threshold.
+- No-stock-warning state is also cleaner.

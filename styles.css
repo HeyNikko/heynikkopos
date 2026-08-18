@@ -16,3 +16,30 @@ select,select.ios-select{color:#332b22!important;-webkit-text-fill-color:#332b22
 .version-badge{font-size:11px;font-weight:800;padding:3px 7px;border-radius:999px;background:#fff0bf;color:#6f4a00;margin-left:8px}
 
 #useMasterQtyBtn{font-weight:700}
+
+.stock-alert{border-radius:14px;border:1px solid var(--line);margin:14px 0 18px;overflow:hidden}
+.stock-alert-main{display:flex;align-items:flex-start;gap:12px;padding:14px 16px}
+.stock-alert-warning{background:#fff9e8;border-color:#f1ddb0}
+.stock-alert-ok{background:#f3f8ef;border-color:#dce9d4}
+.stock-alert-icon{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:900;flex:0 0 28px;background:#f5b51b;color:#332b22}
+.stock-alert-ok .stock-alert-icon{background:#dfeeda}
+.stock-alert-copy{flex:1;min-width:0}
+.stock-alert-title{font-size:16px;font-weight:800;line-height:1.25}
+.stock-alert-subtitle{font-size:13px;color:#7e7063;margin-top:3px}
+.low-stock-preview{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.low-stock-chip{display:inline-flex;gap:5px;align-items:center;padding:5px 8px;border-radius:999px;background:#fff;border:1px solid #eadcbc;font-size:12px;max-width:240px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stock-alert-button{flex:0 0 auto;padding:9px 12px;border-radius:10px;background:#fff;border:1px solid #eadcbc;font-weight:700}
+.low-stock-panel{border-top:1px solid #eadcbc;background:#fff;padding:6px 14px 10px;max-height:320px;overflow:auto}
+.low-stock-row{display:flex;justify-content:space-between;gap:14px;align-items:center;padding:10px 2px;border-bottom:1px solid #f0e7d7}
+.low-stock-row:last-child{border-bottom:0}
+.low-stock-name{font-weight:700}
+.low-stock-sku{font-size:12px;color:#8a7b6c;margin-top:2px}
+.low-stock-numbers{display:flex;gap:18px;text-align:right}
+.low-stock-numbers span{display:flex;flex-direction:column}
+.low-stock-numbers small{font-size:10px;color:#8a7b6c;text-transform:uppercase}
+.low-stock-numbers strong{font-size:15px}
+@media(max-width:700px){
+  .stock-alert-main{flex-wrap:wrap}
+  .stock-alert-button{width:100%}
+  .low-stock-preview{display:none}
+}

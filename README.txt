@@ -159,3 +159,12 @@ FIRST MIGRATION WORKFLOW
 6. Verify cloud product count matches local product count.
 7. Open the same POS URL on the iPad, sign in, and the cloud catalogue will download automatically on a fresh device.
 8. Confirm products, images and Master Stock match before moving to V8 Stage 2 (events/promotions/sales).
+
+
+V8.0.1 LOGIN FIX
+----------------
+- Fixed Cloud Login form reloading the page and reopening after correct credentials.
+- Root cause: V8.0 cloud UI event handlers were accidentally initialized inside Pull Products from Cloud instead of normal app startup.
+- Cloud login, Continue Offline, migration, pull, pending sync and sign-out controls are now bound on startup.
+- Login form now explicitly prevents browser navigation and disables the Sign In button while authenticating.
+- New service-worker cache forces V8.0.1 assets to replace V8.0.

@@ -191,3 +191,14 @@ V8.0.3 IMAGE SYNC FIX
 - Converts the local computer copy from base64 image data to the resulting cloud image URL after successful upload.
 - Shows exact per-SKU errors if an image upload fails.
 - Run this action on the original computer that still has the product photos, NOT on the iPad.
+
+
+V8.1 — CLOUD EVENTS + IMAGE DELIVERY
+------------------------------------
+- Events and Event Inventory now sync through Supabase.
+- Creating or editing an event on the computer queues an automatic cloud sync.
+- A signed-in iPad pulls cloud Events + Event Inventory and automatically selects the newest open event when needed.
+- Event allocations are matched to cloud products using the product cloud ID, while local product IDs remain intact for offline POS compatibility.
+- Product images are served from the Supabase `product-images` bucket.
+- IMPORTANT: run SUPABASE_V8_1_SETUP.sql once in Supabase SQL Editor before using V8.1.
+- V8.1 does NOT yet cloud-sync promotions or completed sales. Do not run the same live event from two iPads yet.

@@ -289,3 +289,16 @@ V8.2.2 — RENDER / EVENT PULL FIX
 - renderAll() now isolates panel render errors so one UI component cannot falsely make a successful cloud event pull look like a database sync failure.
 - No Supabase SQL changes are required for V8.2.2.
 - Existing cloud products, images, events, inventory, promotions and sales are untouched.
+
+
+V8.2.3 — PROMOTION CLOUD SYNC FIX
+--------------------------------
+- Fixed Supabase error 23502: promotions.name cannot be null.
+- Bundle promotions now receive a readable cloud name such as:
+  "Stickers + Postcard · 5 for $10.00"
+- Free-gift promotions now receive a readable cloud name based on the buy/gift products.
+- Sync All now isolates Products, Images, Events, Promotions and Sales.
+  A failure in one section no longer makes the other successful sections appear to have failed.
+- Full Sync Result now shows a separate status for each cloud subsystem.
+- Cloud Product Sync renamed to Cloud Sync.
+- No new Supabase SQL is required for this V8.2.3 patch.

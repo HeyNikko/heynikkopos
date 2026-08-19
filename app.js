@@ -630,11 +630,35 @@ async function pullCloudEvents(options={}){
 }
 
 
+function cloudPromotionName(p,kind){
+  if(kind==='bundle'){
+    const cats=(p.categories||[]).join(' + ')||'Selected categories';
+    return `${cats} · ${Number(p.qty)||0} for ${money(Number(p.bundlePrice)||0)}`;
+  }
+  const buy=prod(p.buy),gift=prod(p.gift);
+  const buyName=buy?.name||buy?.sku||'Product';
+  const giftName=gift?.name||gift?.sku||'Gift';
+  return `Buy ${Number(p.buyQty)||0} ${buyName} · Get ${Number(p.giftQty)||0} ${giftName} free`;
+}
 async function syncPromotionsToCloud(){
   if(!cloudSession||!sb||!navigator.onLine)return false;
   const rows=[];
-  for(const p of db.bundlePromos||[])rows.push({local_id:p.id,promo_kind:'bundle',payload:p,active:p.active!==false,updated_at:nowISO()});
-  for(const p of db.promos||[])rows.push({local_id:p.id,promo_kind:'gift',payload:p,active:p.active!==false,updated_at:nowISO()});
+  for(const p of db.bundlePromos||[])rows.push({
+    local_id:p.id,
+    name:cloudPromotionName(p,'bundle'),
+    promo_kind:'bundle',
+    payload:p,
+    active:p.active!==false,
+    updated_at:nowISO()
+  });
+  for(const p of db.promos||[])rows.push({
+    local_id:p.id,
+    name:cloudPromotionName(p,'gift'),
+    promo_kind:'gift',
+    payload:p,
+    active:p.active!==false,
+    updated_at:nowISO()
+  });
   if(!rows.length)return true;
   const {error}=await sb.from('promotions').upsert(rows,{onConflict:'local_id'});
   if(error)throw error;
@@ -645,8 +669,8 @@ async function pullCloudPromotions(){
   const {data,error}=await sb.from('promotions').select('local_id,promo_kind,payload,active');
   if(error)throw error;
   if(!data?.length)return true;
-  db.bundlePromos=data.filter(r=>r.promo_kind==='bundle').map(r=>({...r.payload,id:r.local_id,active:r.active!==false}));
-  db.promos=data.filter(r=>r.promo_kind==='gift').map(r=>({...r.payload,id:r.local_id,active:r.active!==false}));
+  db.bundlePromos=data.filter(r=>r.promo_kind==='bundle'&&r.payload).map(r=>({...r.payload,id:r.local_id,active:r.active!==false}));
+  db.promos=data.filter(r=>r.promo_kind==='gift'&&r.payload).map(r=>({...r.payload,id:r.local_id,active:r.active!==false}));
   persistLocal();renderPromos();renderCart();
   return true;
 }
@@ -654,63 +678,102 @@ async function pullCloudPromotions(){
 async function syncAllToCloud(){
   if(!cloudSession||!sb)return openCloudLogin();
   if(!navigator.onLine)return toast('Internet connection required to sync');
+
   setCloudStatus('Cloud: syncing all','syncing');
   renderCloudPanel('Starting full cloud sync…');
 
-  let productErrors=[],imageErrors=[],eventOk=false;
-  try{
-    // 1) Push every current local product, not just pending ones.
-    let pDone=0;
-    for(const p of db.products){
-      try{
-        const result=await upsertProductToCloud(p);
-        if(result?.imageWarning)imageErrors.push(`${p.sku}: ${result.imageWarning}`);
-        pDone++;
-        renderCloudPanel(`Syncing products ${pDone}/${db.products.length}…`);
-      }catch(e){
-        productErrors.push(`${p.sku}: ${formatCloudError(e)}`);
-      }
+  const result={
+    products:{ok:0,fail:0,errors:[]},
+    images:{warnings:[]},
+    events:{ok:false,error:''},
+    promotions:{ok:false,error:''},
+    sales:{ok:false,error:''}
+  };
+
+  // PRODUCTS + MASTER STOCK
+  let pDone=0;
+  for(const p of db.products){
+    try{
+      const r=await upsertProductToCloud(p);
+      result.products.ok++;
+      if(r?.imageWarning)result.images.warnings.push(`${p.sku}: ${r.imageWarning}`);
+    }catch(e){
+      result.products.fail++;
+      result.products.errors.push(`${p.sku}: ${formatCloudError(e)}`);
     }
-    setPendingProductIds(new Set());
-    persistLocal();
-    resetProductCloudSnapshot();
-
-    // 2) Retry any cloud products still missing artwork.
-    try{await syncMissingProductImagesSilent()}catch(e){imageErrors.push(formatCloudError(e))}
-
-    // 3) Push all events + event inventory.
-    eventOk=await syncEventsToCloud(false);
-
-    // 4) Promotions must match across checkout devices.
-    await syncPromotionsToCloud();
-
-    // 5) Upload any locally-created sales that are still pending.
-    for(const s of db.sales)if(activeSale(s)&&!s.cloudSynced)queueSaleForCloud(s.id);
-    await syncPendingSales(false);
-
-    await refreshCloudProductCount();
-
-    const problems=productErrors.length+imageErrors.length+(eventOk?0:1);
-    if(problems){
-      setCloudStatus('Cloud: sync issue','warn');
-      const pr=$('#cloudProgress');
-      if(pr)pr.innerHTML=
-        `<strong>Full sync completed with issues</strong><br>`+
-        `Products: ${db.products.length-productErrors.length}/${db.products.length}<br>`+
-        `Events: ${eventOk?'OK':'Failed'}<br>`+
-        (productErrors.length?`<br><strong>Product errors</strong><br>${productErrors.slice(0,4).map(esc).join('<br>')}`:'')+
-        (imageErrors.length?`<br><br><strong>Image warnings</strong><br>${imageErrors.slice(0,4).map(esc).join('<br>')}`:'');
-      toast('Full cloud sync completed with issues');
-    }else{
-      setCloudStatus('Cloud: synced','on');
-      renderCloudPanel(`Full sync complete: ${db.products.length} products + ${db.events.length} events + promotions + sales uploaded.`);
-      toast('Everything supported is synced to cloud');
-    }
-  }catch(e){
-    setCloudStatus('Cloud: sync issue','warn');
-    renderCloudPanel(`Full sync failed: ${formatCloudError(e)}`);
-    toast('Full sync failed');
+    pDone++;
+    renderCloudPanel(`Syncing products ${pDone}/${db.products.length}…`);
   }
+  setPendingProductIds(new Set());
+  persistLocal();
+  resetProductCloudSnapshot();
+
+  // MISSING IMAGES
+  try{
+    await syncMissingProductImagesSilent();
+  }catch(e){
+    result.images.warnings.push(formatCloudError(e));
+  }
+
+  // EVENTS + EVENT INVENTORY
+  try{
+    result.events.ok=await syncEventsToCloud(false);
+    if(!result.events.ok)result.events.error='Event sync did not complete.';
+  }catch(e){
+    result.events.error=formatCloudError(e);
+  }
+
+  // PROMOTIONS
+  try{
+    result.promotions.ok=await syncPromotionsToCloud();
+  }catch(e){
+    result.promotions.error=formatCloudError(e);
+  }
+
+  // SALES
+  try{
+    for(const s of db.sales)if(activeSale(s)&&!s.cloudSynced)queueSaleForCloud(s.id);
+    result.sales.ok=await syncPendingSales(false);
+  }catch(e){
+    result.sales.error=formatCloudError(e);
+  }
+
+  await refreshCloudProductCount();
+
+  const issues=
+    result.products.fail+
+    result.images.warnings.length+
+    (result.events.ok?0:1)+
+    (result.promotions.ok?0:1)+
+    (result.sales.ok?0:1);
+
+  const statusLines=[
+    `<strong>Products / Master Stock:</strong> ${result.products.ok}/${db.products.length}${result.products.fail?' ⚠':''}`,
+    `<strong>Product images:</strong> ${result.images.warnings.length?'⚠ '+result.images.warnings.length+' warning(s)':'OK'}`,
+    `<strong>Events / Event Stock:</strong> ${result.events.ok?'OK':'⚠ Failed'}`,
+    `<strong>Promotions:</strong> ${result.promotions.ok?'OK':'⚠ Failed'}`,
+    `<strong>Sales:</strong> ${result.sales.ok?'OK':'⚠ Pending / Failed'}`
+  ];
+
+  const details=[];
+  if(result.products.errors.length)details.push(`<br><strong>Product errors</strong><br>${result.products.errors.slice(0,4).map(esc).join('<br>')}`);
+  if(result.images.warnings.length)details.push(`<br><strong>Image warnings</strong><br>${result.images.warnings.slice(0,4).map(esc).join('<br>')}`);
+  if(result.events.error)details.push(`<br><strong>Event error</strong><br>${esc(result.events.error)}`);
+  if(result.promotions.error)details.push(`<br><strong>Promotion error</strong><br>${esc(result.promotions.error)}`);
+  if(result.sales.error)details.push(`<br><strong>Sales error</strong><br>${esc(result.sales.error)}`);
+
+  const pr=$('#cloudProgress');
+  if(pr)pr.innerHTML=`<strong>Full sync result</strong><br>${statusLines.join('<br>')}${details.join('')}`;
+
+  if(issues){
+    setCloudStatus('Cloud: sync issue','warn');
+    toast('Cloud sync completed with issues — see details');
+  }else{
+    setCloudStatus('Cloud: synced','on');
+    toast('Everything is synced to cloud');
+  }
+  renderCloudPanel();
+  if(pr)pr.innerHTML=`<strong>Full sync result</strong><br>${statusLines.join('<br>')}${details.join('')}`;
 }
 async function syncMissingProductImagesSilent(){
   if(!cloudSession||!sb||!navigator.onLine)return;

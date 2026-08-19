@@ -267,3 +267,15 @@ ONE-TOUCH SYNC:
 CURRENT LIMITATION:
 - Sale VOID / EDIT / permanent DELETE are still primarily local operations in V8.2.
   Do not use those as cross-device cloud workflows yet; cloud-safe reversal/edit will be added next.
+
+
+V8.2.1 — SUPABASE LIBRARY LOADER HOTFIX
+---------------------------------------
+- Fixed false "Supabase library could not load" login failure after the V8.2 deployment.
+- Replaced the single CDN dependency with a resilient loader that tries jsDelivr first and unpkg second.
+- app.js is loaded only after the cloud-library attempt completes, while the local POS still starts even if both CDNs fail.
+- initCloud() can retry the library dynamically without reloading the whole page.
+- Added "Retry Cloud Library" to the login dialog when needed.
+- Error messages now report a library/CDN loading problem instead of incorrectly saying the device has no internet.
+- Service worker continues to intercept/cache only same-origin GitHub Pages files and never Supabase/CDN traffic.
+- No Supabase SQL changes are required specifically for V8.2.1. Keep the V8.2 database setup already applied.

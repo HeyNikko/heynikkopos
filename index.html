@@ -10,11 +10,11 @@
   <title>HeyNikko POS</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
-  <link rel="stylesheet" href="styles.css?v=8.2">
+  <link rel="stylesheet" href="styles.css?v=8.2.1">
 </head>
 <body>
 <header>
-  <div><strong>☀️ HeyNikko POS</strong><span id="appVersion" class="version-badge">V8.2</span><span id="offlineBadge">Offline ready</span><span id="cloudBadge" class="cloud-badge cloud-off">Cloud: signed out</span><button id="cloudAccountBtn" class="cloud-account-btn" type="button">Sign in</button></div>
+  <div><strong>☀️ HeyNikko POS</strong><span id="appVersion" class="version-badge">V8.2.1</span><span id="offlineBadge">Offline ready</span><span id="cloudBadge" class="cloud-badge cloud-off">Cloud: signed out</span><button id="cloudAccountBtn" class="cloud-account-btn" type="button">Sign in</button></div>
   <nav>
     <button class="tab active" data-view="pos">POS</button>
     <button class="tab" data-view="events">Events</button>
@@ -161,7 +161,25 @@
   <p class="muted">Sign in to sync the same product catalogue and Master Stock between your computer and iPad.</p>
   <label>Email<input id="cloudEmail" type="email" autocomplete="username" required placeholder="hello@heynikko.com"></label>
   <label>Password<input id="cloudPassword" type="password" autocomplete="current-password" required></label>
-  <p id="cloudLoginError" class="cloud-error"></p>
+  <p id="cloudLoginError" class="cloud-error"></p><button id="cloudRetryLibraryBtn" type="button" class="ghost" style="display:none;width:100%;margin-bottom:8px">Retry Cloud Library</button>
   <menu><button id="cloudOfflineBtn" type="button" class="ghost">Continue Offline</button><button type="submit" class="primary">Sign In</button></menu>
 </form></dialog>
-<div id="toast"></div><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="app.js?v=8.2"></script></body></html>
+<div id="toast"></div><script>
+(function(){
+  const sources=[
+    'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js',
+    'https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.min.js'
+  ];
+  function load(src){return new Promise((resolve,reject)=>{const s=document.createElement('script');s.src=src;s.async=true;s.onload=()=>window.supabase?resolve(src):reject(new Error('Loaded but Supabase global missing'));s.onerror=()=>reject(new Error('Failed to load '+src));document.head.appendChild(s)})}
+  async function boot(){
+    window.__supabaseLoadError='';
+    if(!window.supabase){
+      for(const src of sources){
+        try{await load(src);break}catch(e){window.__supabaseLoadError=e.message}
+      }
+    }
+    const a=document.createElement('script');a.src='app.js?v=8.2.1';a.defer=false;document.body.appendChild(a);
+  }
+  boot();
+})();
+</script></body></html>

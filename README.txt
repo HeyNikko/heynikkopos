@@ -168,3 +168,14 @@ V8.0.1 LOGIN FIX
 - Cloud login, Continue Offline, migration, pull, pending sync and sign-out controls are now bound on startup.
 - Login form now explicitly prevents browser navigation and disables the Sign In button while authenticating.
 - New service-worker cache forces V8.0.1 assets to replace V8.0.
+
+
+V8.0.2 MIGRATION FIX
+--------------------
+- Product migration no longer uploads the image before the product row.
+- Product details and Master Stock are written to Supabase first.
+- Product image upload happens afterward and cannot block the product record from migrating.
+- Exact Supabase error code/message/details/hint are now shown in Cloud Product Sync when a product write fails.
+- Image upload errors are reported separately as warnings.
+- Cloud product count refreshes after migration so successful database writes are immediately visible.
+- New service-worker cache forces V8.0.2 assets to replace V8.0.1.

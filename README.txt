@@ -336,3 +336,36 @@ Run SUPABASE_V8_3_1_SETUP.sql once before using this build.
 - Offline deletes are queued and hidden locally until Supabase confirms deletion.
 - Pending-delete tombstones suppress automatic cloud pulls, so deleted rows cannot reappear.
 - Bulk Delete uses the same cloud-safe flow.
+
+
+V8.4 — LIVE MULTI-DEVICE SYNC
+-----------------------------
+Run SUPABASE_V8_4_SETUP.sql once before using this build.
+
+NEW REALTIME FLOW
+-----------------
+iPad checkout
+→ Supabase sale + sale items + event stock
+→ Supabase Realtime
+→ PC/other signed-in devices refresh sales and stock automatically
+
+Realtime covers:
+- New completed sales
+- Voids
+- Permanent sale deletes
+- Event inventory / booth stock changes
+
+RELIABILITY LAYERS
+------------------
+1. Supabase Realtime is the primary cross-device update path.
+2. Existing 15-second background polling remains as a fallback.
+3. Returning to the browser tab (visibility/focus/pageshow) forces an immediate sales + stock refresh.
+4. Offline sale / void / delete queues remain unchanged and sync when internet returns.
+5. The Sales > Refresh button now pulls cloud sales before rendering instead of only refreshing local UI.
+
+EXPECTED WORKFLOW
+-----------------
+- Keep PC and iPad signed into the same Supabase account.
+- A sale keyed on iPad should appear on the PC automatically within about 1 second when both are online.
+- No manual Pull All is required for ordinary booth sales.
+- Pull All remains useful for full workspace recovery/setup on a new device.

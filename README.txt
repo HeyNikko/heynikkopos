@@ -279,3 +279,13 @@ V8.2.1 — SUPABASE LIBRARY LOADER HOTFIX
 - Error messages now report a library/CDN loading problem instead of incorrectly saying the device has no internet.
 - Service worker continues to intercept/cache only same-origin GitHub Pages files and never Supabase/CDN traffic.
 - No Supabase SQL changes are required specifically for V8.2.1. Keep the V8.2 database setup already applied.
+
+
+V8.2.2 — RENDER / EVENT PULL FIX
+--------------------------------
+- Fixed "renderProductTable is not defined" after Pull All / event cloud pull.
+- Restored the Master Stock table renderer accidentally removed during the V8.2 checkout rewrite.
+- Restored setImagePreview(), which is required when adding/editing product artwork.
+- renderAll() now isolates panel render errors so one UI component cannot falsely make a successful cloud event pull look like a database sync failure.
+- No Supabase SQL changes are required for V8.2.2.
+- Existing cloud products, images, events, inventory, promotions and sales are untouched.

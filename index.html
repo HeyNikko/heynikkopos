@@ -10,11 +10,11 @@
   <title>HeyNikko POS</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
-  <link rel="stylesheet" href="styles.css?v=6.5">
+  <link rel="stylesheet" href="styles.css?v=8.0">
 </head>
 <body>
 <header>
-  <div><strong>☀️ HeyNikko POS</strong><span id="appVersion" class="version-badge">V7.2</span><span id="offlineBadge">Offline ready</span></div>
+  <div><strong>☀️ HeyNikko POS</strong><span id="appVersion" class="version-badge">V8.0</span><span id="offlineBadge">Offline ready</span><span id="cloudBadge" class="cloud-badge cloud-off">Cloud: signed out</span><button id="cloudAccountBtn" class="cloud-account-btn" type="button">Sign in</button></div>
   <nav>
     <button class="tab active" data-view="pos">POS</button>
     <button class="tab" data-view="events">Events</button>
@@ -87,6 +87,17 @@
       <label class="ghost file-label">Restore Backup<input id="restoreJson" type="file" accept="application/json" hidden></label>
     </div>
     <p class="muted">Keep regular JSON backups because iPad browser storage is local to the device.</p>
+    <div class="cloud-sync-card">
+      <div class="cloud-sync-head"><div><h3>☁ Cloud Product Sync</h3><p class="muted">V8.0 syncs Products, Master Stock and product images with Supabase. Events, promotions and sales remain local in this first migration stage.</p></div><span id="cloudPanelStatus" class="status-pill">Signed out</span></div>
+      <div id="cloudSyncStats" class="cloud-stats"><span>Local products: —</span><span>Cloud products: —</span><span>Pending: —</span></div>
+      <div class="cloud-actions">
+        <button id="cloudMigrateBtn" class="primary" type="button">Migrate Local Products to Cloud</button>
+        <button id="cloudPullBtn" class="ghost" type="button">Pull Products from Cloud</button>
+        <button id="cloudSyncBtn" class="ghost" type="button">Sync Pending Products</button>
+        <button id="cloudSignOutBtn" class="ghost" type="button">Sign Out</button>
+      </div>
+      <div id="cloudProgress" class="cloud-progress muted"></div>
+    </div>
   </div>
 </section>
 </main>
@@ -134,4 +145,13 @@
 
 <dialog id="saleViewDialog"><div class="dialog-body"><div class="dialog-title-row"><h3>Sale Details</h3><button type="button" class="ghost" data-close-dialog="saleViewDialog">Close</button></div><div id="saleViewContent"></div></div></dialog>
 <dialog id="saleEditDialog"><form method="dialog" id="saleEditForm"><h3>Edit Sale</h3><input type="hidden" id="editSaleId"><p id="editSaleReceipt" class="muted"></p><label>Payment method<select id="editSalePayment"><option>Cash</option><option>PayNow</option></select></label><div id="editSaleItems" class="edit-sale-items"></div><div class="add-sale-item"><select id="editAddProduct"></select><button type="button" id="editAddProductBtn" class="ghost">+ Add Product</button></div><div class="edit-sale-total"><span>Updated total</span><strong id="editSaleTotal">$0.00</strong></div><p class="muted">Sales for closed events are view-only. Active-event edits automatically correct event inventory.</p><menu><button value="cancel" class="ghost">Cancel</button><button value="default" class="primary">Save Changes</button></menu></form></dialog>
-<div id="toast"></div><script src="app.js?v=7.2"></script></body></html>
+
+<dialog id="cloudLoginDialog" class="cloud-login-dialog"><form id="cloudLoginForm" class="dialog-body">
+  <h3>HeyNikko POS Cloud Login</h3>
+  <p class="muted">Sign in to sync the same product catalogue and Master Stock between your computer and iPad.</p>
+  <label>Email<input id="cloudEmail" type="email" autocomplete="username" required placeholder="hello@heynikko.com"></label>
+  <label>Password<input id="cloudPassword" type="password" autocomplete="current-password" required></label>
+  <p id="cloudLoginError" class="cloud-error"></p>
+  <menu><button id="cloudOfflineBtn" type="button" class="ghost">Continue Offline</button><button type="submit" class="primary">Sign In</button></menu>
+</form></dialog>
+<div id="toast"></div><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="app.js?v=8.0"></script></body></html>

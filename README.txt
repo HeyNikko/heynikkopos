@@ -124,3 +124,38 @@ V7.2 CATEGORY BUTTONS
 - Search and category buttons remain sticky at the top of the Products panel while scrolling.
 - Category buttons scroll horizontally if more categories are added later.
 - The original hidden select remains underneath for compatibility with the existing filter logic.
+
+
+V8.0 CLOUD PRODUCTS — SUPABASE MIGRATION STAGE 1
+-------------------------------------------------
+- Keeps V7.2 POS UI and localStorage offline operation.
+- Adds Supabase email/password sign-in.
+- Supabase is the cloud source for Products, Master Stock and product images.
+- Adds Cloud / Syncing / Offline / Signed Out status indicators.
+- Adds Export > Cloud Product Sync controls:
+  * Migrate Local Products to Cloud
+  * Pull Products from Cloud
+  * Sync Pending Products
+  * Sign Out
+- Existing local product IDs are preserved when cloud products match by SKU, protecting current local event references.
+- Product images stored as local data URLs are uploaded to Supabase Storage bucket `product-images` during migration/sync.
+- Product edits and Master Stock changes are detected locally and queued for sync.
+- Pending product changes survive reloads and sync when internet/auth returns.
+- On a fresh device with no sales/events, signing in automatically downloads the cloud product catalogue.
+- EVENTS, PROMOTIONS AND SALES ARE STILL LOCAL IN V8.0 STAGE 1. Do not use multiple devices for live event sales yet.
+
+SUPABASE PROJECT
+----------------
+Project URL is embedded using the browser-safe publishable key supplied for this project.
+Never replace it with a service_role or secret key.
+
+FIRST MIGRATION WORKFLOW
+------------------------
+1. Update GitHub Pages with V8.0 files.
+2. Open POS on the computer that currently contains the full catalogue.
+3. Sign in with the Supabase Auth user.
+4. Go to Export > Cloud Product Sync.
+5. Click "Migrate Local Products to Cloud" and keep the tab open until complete.
+6. Verify cloud product count matches local product count.
+7. Open the same POS URL on the iPad, sign in, and the cloud catalogue will download automatically on a fresh device.
+8. Confirm products, images and Master Stock match before moving to V8 Stage 2 (events/promotions/sales).

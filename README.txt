@@ -369,3 +369,16 @@ EXPECTED WORKFLOW
 - A sale keyed on iPad should appear on the PC automatically within about 1 second when both are online.
 - No manual Pull All is required for ordinary booth sales.
 - Pull All remains useful for full workspace recovery/setup on a new device.
+
+
+V8.4.1 — CLOUD SALES IMPORT HOTFIX
+----------------------------------
+- Fixed the PC/cloud importer crash that prevented Supabase sales from appearing in Sales History.
+- Root cause: pullCloudSales() declared the rebuilt cloud-sales array with `const` and later reassigned it after filtering pending deletes, causing:
+  "Assignment to constant variable."
+- The importer now uses a mutable array correctly.
+- Sales > Refresh now reports how many cloud sales were imported.
+- Realtime no longer reports a successful live update if the underlying sales pull failed.
+- Cloud Sync now surfaces the actual sales-pull error instead of failing silently in the browser console.
+- No Supabase SQL changes are required for V8.4.1.
+- Existing Supabase sales and sale_items are untouched.

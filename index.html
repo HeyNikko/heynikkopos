@@ -10,11 +10,11 @@
   <title>HeyNikko POS</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
-  <link rel="stylesheet" href="styles.css?v=8.1.1">
+  <link rel="stylesheet" href="styles.css?v=8.1.2">
 </head>
 <body>
 <header>
-  <div><strong>☀️ HeyNikko POS</strong><span id="appVersion" class="version-badge">V8.1.1</span><span id="offlineBadge">Offline ready</span><span id="cloudBadge" class="cloud-badge cloud-off">Cloud: signed out</span><button id="cloudAccountBtn" class="cloud-account-btn" type="button">Sign in</button></div>
+  <div><strong>☀️ HeyNikko POS</strong><span id="appVersion" class="version-badge">V8.1.2</span><span id="offlineBadge">Offline ready</span><span id="cloudBadge" class="cloud-badge cloud-off">Cloud: signed out</span><button id="cloudAccountBtn" class="cloud-account-btn" type="button">Sign in</button></div>
   <nav>
     <button class="tab active" data-view="pos">POS</button>
     <button class="tab" data-view="events">Events</button>
@@ -90,15 +90,22 @@
     <div class="cloud-sync-card">
       <div class="cloud-sync-head"><div><h3>☁ Cloud Product Sync</h3><p class="muted">V8.0 syncs Products, Master Stock and product images with Supabase. Events, promotions and sales remain local in this first migration stage.</p></div><span id="cloudPanelStatus" class="status-pill">Signed out</span></div>
       <div id="cloudSyncStats" class="cloud-stats"><span>Local products: —</span><span>Cloud products: —</span><span>Pending: —</span></div>
-      <div class="cloud-actions">
-        <button id="cloudMigrateBtn" class="primary" type="button">Migrate Local Products to Cloud</button>
-        <button id="cloudPullBtn" class="ghost" type="button">Pull Products from Cloud</button>
-        <button id="cloudSyncBtn" class="ghost" type="button">Sync Pending Products</button>
-        <button id="cloudImageSyncBtn" class="ghost" type="button">Sync Missing Product Images</button>
-        <button id="cloudEventPushBtn" class="ghost" type="button">Sync Events to Cloud</button>
-        <button id="cloudEventPullBtn" class="ghost" type="button">Pull Events from Cloud</button>
-        <button id="cloudSignOutBtn" class="ghost" type="button">Sign Out</button>
+      <div class="cloud-actions cloud-main-actions">
+        <button id="cloudSyncAllBtn" class="primary" type="button">☁ Sync All to Cloud</button>
+        <button id="cloudPullAllBtn" class="primary" type="button">↓ Pull All from Cloud</button>
       </div>
+      <details class="cloud-advanced">
+        <summary>Advanced sync tools</summary>
+        <div class="cloud-actions">
+          <button id="cloudMigrateBtn" class="ghost" type="button">Migrate Local Products</button>
+          <button id="cloudPullBtn" class="ghost" type="button">Pull Products Only</button>
+          <button id="cloudSyncBtn" class="ghost" type="button">Sync Pending Products</button>
+          <button id="cloudImageSyncBtn" class="ghost" type="button">Sync Missing Images</button>
+          <button id="cloudEventPushBtn" class="ghost" type="button">Sync Events Only</button>
+          <button id="cloudEventPullBtn" class="ghost" type="button">Pull Events Only</button>
+        </div>
+      </details>
+      <div class="cloud-actions"><button id="cloudSignOutBtn" class="ghost" type="button">Sign Out</button></div>
       <div id="cloudProgress" class="cloud-progress muted"></div>
     </div>
   </div>
@@ -157,4 +164,4 @@
   <p id="cloudLoginError" class="cloud-error"></p>
   <menu><button id="cloudOfflineBtn" type="button" class="ghost">Continue Offline</button><button type="submit" class="primary">Sign In</button></menu>
 </form></dialog>
-<div id="toast"></div><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="app.js?v=8.1.1"></script></body></html>
+<div id="toast"></div><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="app.js?v=8.1.2"></script></body></html>

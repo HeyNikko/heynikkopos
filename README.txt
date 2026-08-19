@@ -212,3 +212,15 @@ V8.1.1 EVENT SYNC FIX
 - Fresh devices pull events instead of first attempting to push an empty local event list.
 - Devices with existing events push first, then pull the canonical cloud copy.
 - Run SUPABASE_V8_1_1_EVENT_FIX.sql once before testing this build.
+
+
+V8.1.2 — ONE-TOUCH CLOUD SYNC
+-----------------------------
+- Added one main "Sync All to Cloud" button.
+  Syncs all currently-supported cloud data:
+  Products, Master Stock, product images, Events and Event Inventory.
+- Added one main "Pull All from Cloud" button.
+  Downloads Products, Master Stock, image URLs, Events and Event Inventory to the current device.
+- Individual sync buttons remain under "Advanced sync tools" for troubleshooting only.
+- Includes SUPABASE_V8_1_2_SETUP.sql to add/fix missing updated_at columns and force PostgREST schema-cache reload.
+- Promotions and completed Sales are NOT cloud synced yet. They are planned for the next cloud stage.

@@ -646,6 +646,7 @@ async function syncPromotionsToCloud(){
   for(const p of db.bundlePromos||[])rows.push({
     local_id:p.id,
     name:cloudPromotionName(p,'bundle'),
+    promo_type:'bundle',
     promo_kind:'bundle',
     payload:p,
     active:p.active!==false,
@@ -654,6 +655,7 @@ async function syncPromotionsToCloud(){
   for(const p of db.promos||[])rows.push({
     local_id:p.id,
     name:cloudPromotionName(p,'gift'),
+    promo_type:'gift',
     promo_kind:'gift',
     payload:p,
     active:p.active!==false,
@@ -666,11 +668,11 @@ async function syncPromotionsToCloud(){
 }
 async function pullCloudPromotions(){
   if(!cloudSession||!sb||!navigator.onLine)return false;
-  const {data,error}=await sb.from('promotions').select('local_id,promo_kind,payload,active');
+  const {data,error}=await sb.from('promotions').select('local_id,promo_type,promo_kind,payload,active');
   if(error)throw error;
   if(!data?.length)return true;
-  db.bundlePromos=data.filter(r=>r.promo_kind==='bundle'&&r.payload).map(r=>({...r.payload,id:r.local_id,active:r.active!==false}));
-  db.promos=data.filter(r=>r.promo_kind==='gift'&&r.payload).map(r=>({...r.payload,id:r.local_id,active:r.active!==false}));
+  db.bundlePromos=data.filter(r=>(r.promo_type||r.promo_kind)==='bundle'&&r.payload).map(r=>({...r.payload,id:r.local_id,active:r.active!==false}));
+  db.promos=data.filter(r=>(r.promo_type||r.promo_kind)==='gift'&&r.payload).map(r=>({...r.payload,id:r.local_id,active:r.active!==false}));
   persistLocal();renderPromos();renderCart();
   return true;
 }

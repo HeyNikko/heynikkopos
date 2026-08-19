@@ -302,3 +302,13 @@ V8.2.3 — PROMOTION CLOUD SYNC FIX
 - Full Sync Result now shows a separate status for each cloud subsystem.
 - Cloud Product Sync renamed to Cloud Sync.
 - No new Supabase SQL is required for this V8.2.3 patch.
+
+
+V8.2.4 — PROMOTION TYPE SYNC FIX
+--------------------------------
+- Fixed Supabase error 23502: promotions.promo_type cannot be null.
+- Bundle promotions now write promo_type='bundle'.
+- Free-gift promotions now write promo_type='gift'.
+- promo_kind is still written for backward compatibility with the V8.2 cloud format.
+- Promotion pull now accepts either promo_type or promo_kind.
+- No Supabase SQL changes are required for this patch.

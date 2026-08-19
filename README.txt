@@ -312,3 +312,15 @@ V8.2.4 — PROMOTION TYPE SYNC FIX
 - promo_kind is still written for backward compatibility with the V8.2 cloud format.
 - Promotion pull now accepts either promo_type or promo_kind.
 - No Supabase SQL changes are required for this patch.
+
+
+V8.3 — CLOUD-SAFE VOIDING
+-------------------------
+Run SUPABASE_V8_3_SETUP.sql once before using this version.
+
+- Voiding a synced sale now updates Supabase instead of only the local browser.
+- Supabase restores event inventory exactly once and marks the cloud sale VOIDED.
+- Other devices pulling sales receive the VOIDED state, so the transaction cannot reappear as completed.
+- Offline voids are stored in a persistent Pending Voids queue and sync automatically when internet returns.
+- Repeated void-sync attempts are idempotent and cannot double-restore stock.
+- Cloud-synced sales can no longer be permanently deleted from the UI; use Void to preserve audit history.

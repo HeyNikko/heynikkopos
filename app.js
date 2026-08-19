@@ -5,6 +5,7 @@ const CLOUD_PENDING_KEY='heynikko_pos_v8_pending_products';
 const CLOUD_PENDING_SALES_KEY='heynikko_pos_v8_pending_sales';
 const CLOUD_SALES_ERRORS_KEY='heynikko_pos_v8_sales_errors';
 const CLOUD_PENDING_VOIDS_KEY='heynikko_pos_v8_pending_voids';
+const CLOUD_PENDING_DELETES_KEY='heynikko_pos_v8_pending_deletes';
 
 const CATEGORIES=['Stickers','Sticker Sheets','Keychain','Postcard'];
 const DEFAULT_BUNDLES=[
@@ -218,9 +219,27 @@ function togglePromoFields(){const gift=$('#promoType').value==='gift';$('#giftP
 function openPromo(){promoOptions();$('#promoType').value='bundle';togglePromoFields();$$('#promoCategoryChecks input').forEach(x=>x.checked=false);$('#bundleQty').value=5;$('#bundlePrice').value=10;$('#promoDialog').showModal()}
 function savePromoForm(e){e.preventDefault();if($('#promoType').value==='bundle'){const categories=$$('#promoCategoryChecks input:checked').map(x=>x.value);if(!categories.length)return toast('Choose at least one category');db.bundlePromos.push({id:uid('bp'),type:'bundle',categories,qty:+$('#bundleQty').value,bundlePrice:+$('#bundlePrice').value,active:true})}else db.promos.push({id:uid('pr'),type:'gift',buy:$('#promoBuy').value,buyQty:+$('#promoBuyQty').value,gift:$('#promoGift').value,giftQty:+$('#promoGiftQty').value,active:true});save();$('#promoDialog').close();recalcPromos();renderAll();toast('Promotion saved')}
 function updateSalesBulkControls(){selectedSaleIds=new Set([...selectedSaleIds].filter(id=>db.sales.some(s=>s.id===id)));const n=selectedSaleIds.size,count=$('#salesSelectedCount'),del=$('#deleteSelectedSales'),head=$('#salesHeaderCheck');if(count)count.textContent=`${n} selected`;if(del)del.disabled=!n;if(head){head.checked=db.sales.length>0&&n===db.sales.length;head.indeterminate=n>0&&n<db.sales.length}}
-function renderSales(){const today=new Date(),todayKey=today.toDateString(),active=db.sales.filter(activeSale),tod=active.filter(s=>new Date(s.createdAt).toDateString()===todayKey),sum=a=>a.reduce((n,s)=>n+s.total,0);$('#salesSummary').innerHTML=`<div class="stat"><span>Today · ${today.toLocaleDateString('en-SG',{day:'numeric',month:'short',year:'numeric'})}</span><strong>${money(sum(tod))}</strong></div><div class="stat"><span>Transactions</span><strong>${tod.length}</strong></div><div class="stat"><span>All-time</span><strong>${money(sum(active))}</strong></div>`;$('#salesTable').innerHTML=db.sales.map(s=>{const e=eventById(s.eventId),locked=e?.status==='closed',checked=selectedSaleIds.has(s.id)?'checked':'';return`<tr class="${activeSale(s)?'':'voided-row'}"><td class="select-col"><input class="sales-check" type="checkbox" data-sale-select="${s.id}" ${checked} aria-label="Select ${esc(s.receipt)}"></td><td>${new Date(s.createdAt).toLocaleString('en-SG')}</td><td>${esc(s.eventName||'Legacy / Master')}</td><td>${esc(s.payment)}</td><td>${s.items.reduce((a,i)=>a+i.qty,0)}</td><td>${money(s.total)}</td><td><span class="status-pill ${activeSale(s)?'active':'voided'}">${activeSale(s)?(s.updatedAt?'EDITED':'COMPLETED'):'VOIDED'}${activeSale(s)&&!s.cloudSynced?' · SYNC PENDING':''}${!activeSale(s)&&!s.cloudVoidSynced?' · VOID PENDING':''}</span></td><td><div class="action-row"><button class="ghost" data-view-sale="${s.id}">View</button>${activeSale(s)&&!locked?`<button class="ghost" data-edit-sale="${s.id}">Edit</button>`:''}${activeSale(s)?`<button class="danger-btn" data-void-sale="${s.id}">Void</button>`:''}<button class="danger-btn" data-delete-sale="${s.id}">Delete</button></div></td></tr>`}).join('')||'<tr><td colspan="8" class="muted">No sales yet.</td></tr>';$$('[data-sale-select]').forEach(c=>c.onchange=()=>{if(c.checked)selectedSaleIds.add(c.dataset.saleSelect);else selectedSaleIds.delete(c.dataset.saleSelect);updateSalesBulkControls()});$$('[data-view-sale]').forEach(b=>b.onclick=()=>viewSale(b.dataset.viewSale));$$('[data-edit-sale]').forEach(b=>b.onclick=()=>openEditSale(b.dataset.editSale));$$('[data-void-sale]').forEach(b=>b.onclick=()=>voidSale(b.dataset.voidSale));$$('[data-delete-sale]').forEach(b=>b.onclick=()=>deleteSalePermanently(b.dataset.deleteSale));updateSalesBulkControls()}
+function renderSales(){const visibleSales=db.sales.filter(s=>!s.deletedPending),today=new Date(),todayKey=today.toDateString(),active=visibleSales.filter(activeSale),tod=active.filter(s=>new Date(s.createdAt).toDateString()===todayKey),sum=a=>a.reduce((n,s)=>n+s.total,0);$('#salesSummary').innerHTML=`<div class="stat"><span>Today · ${today.toLocaleDateString('en-SG',{day:'numeric',month:'short',year:'numeric'})}</span><strong>${money(sum(tod))}</strong></div><div class="stat"><span>Transactions</span><strong>${tod.length}</strong></div><div class="stat"><span>All-time</span><strong>${money(sum(active))}</strong></div>`;$('#salesTable').innerHTML=visibleSales.map(s=>{const e=eventById(s.eventId),locked=e?.status==='closed',checked=selectedSaleIds.has(s.id)?'checked':'';return`<tr class="${activeSale(s)?'':'voided-row'}"><td class="select-col"><input class="sales-check" type="checkbox" data-sale-select="${s.id}" ${checked} aria-label="Select ${esc(s.receipt)}"></td><td>${new Date(s.createdAt).toLocaleString('en-SG')}</td><td>${esc(s.eventName||'Legacy / Master')}</td><td>${esc(s.payment)}</td><td>${s.items.reduce((a,i)=>a+i.qty,0)}</td><td>${money(s.total)}</td><td><span class="status-pill ${activeSale(s)?'active':'voided'}">${activeSale(s)?(s.updatedAt?'EDITED':'COMPLETED'):'VOIDED'}${activeSale(s)&&!s.cloudSynced?' · SYNC PENDING':''}${!activeSale(s)&&!s.cloudVoidSynced?' · VOID PENDING':''}</span></td><td><div class="action-row"><button class="ghost" data-view-sale="${s.id}">View</button>${activeSale(s)&&!locked?`<button class="ghost" data-edit-sale="${s.id}">Edit</button>`:''}${activeSale(s)?`<button class="danger-btn" data-void-sale="${s.id}">Void</button>`:''}<button class="danger-btn" data-delete-sale="${s.id}">Delete</button></div></td></tr>`}).join('')||'<tr><td colspan="8" class="muted">No sales yet.</td></tr>';$$('[data-sale-select]').forEach(c=>c.onchange=()=>{if(c.checked)selectedSaleIds.add(c.dataset.saleSelect);else selectedSaleIds.delete(c.dataset.saleSelect);updateSalesBulkControls()});$$('[data-view-sale]').forEach(b=>b.onclick=()=>viewSale(b.dataset.viewSale));$$('[data-edit-sale]').forEach(b=>b.onclick=()=>openEditSale(b.dataset.editSale));$$('[data-void-sale]').forEach(b=>b.onclick=()=>voidSale(b.dataset.voidSale));$$('[data-delete-sale]').forEach(b=>b.onclick=()=>deleteSalePermanently(b.dataset.deleteSale));updateSalesBulkControls()}
 function restoreSaleStockForDelete(s){const ev=eBySale(s);if(!activeSale(s))return;for(const i of s.items){const p=prod(i.productId);if(!p)continue;if(ev&&ev.status==='open'){ev.stock[p.id]=(ev.stock[p.id]||0)+i.qty;ev.activeProducts[p.id]=true}else p.stock+=i.qty}}
-function bulkDeleteSelectedSales(){const ids=[...selectedSaleIds].filter(id=>db.sales.some(s=>s.id===id));if(!ids.length)return toast('Select at least one sale');const sales=ids.map(id=>db.sales.find(s=>s.id===id)).filter(Boolean),activeCount=sales.filter(activeSale).length;if(!confirm(`Delete ${sales.length} selected sale${sales.length===1?'':'s'} permanently?\n\n${activeCount?`${activeCount} active sale${activeCount===1?'':'s'} will have stock restored first.\n`:''}This cannot be undone.`))return;const receipts=new Set();for(const s of sales){restoreSaleStockForDelete(s);receipts.add(s.receipt)}const idSet=new Set(ids);db.sales=db.sales.filter(s=>!idSet.has(s.id));db.movements=db.movements.filter(m=>!receipts.has(m.receipt));selectedSaleIds.clear();save();renderAll();toast(`${sales.length} sale${sales.length===1?'':'s'} permanently deleted`)}
+async function bulkDeleteSelectedSales(){
+  const ids=[...selectedSaleIds].filter(id=>db.sales.some(s=>s.id===id));
+  if(!ids.length)return toast('Select at least one sale');
+  if(!confirm(`Delete ${ids.length} selected sale${ids.length===1?'':'s'} permanently from this device and cloud? This cannot be undone.`))return;
+  for(const id of ids){
+    const s=db.sales.find(x=>x.id===id);if(!s)continue;
+    if(activeSale(s))restoreSaleStockForDelete(s);
+    s.deletedPending=true;s.deletedAt=nowISO();
+    const ps=getPendingSaleIds();ps.delete(id);setPendingSaleIds(ps);
+    const pv=getPendingVoidIds();pv.delete(id);setPendingVoidIds(pv);
+    queueDeleteForCloud(id);
+  }
+  selectedSaleIds.clear();save();renderAll();
+  if(cloudSession&&sb&&navigator.onLine){
+    const ok=await syncPendingDeletes(false);
+    if(ok){await pullCloudSales({showToast:false});await refreshCurrentEventInventoryFromCloud();renderAll();toast('Selected sales permanently deleted')}
+    else toast('Selected sales hidden locally · some cloud deletes pending');
+  }else toast('Selected sales hidden locally · deletes queued');
+}
 function viewSale(id){const s=db.sales.find(x=>x.id===id);if(!s)return;$('#saleViewContent').innerHTML=`<div class="receipt-meta"><div><span>Receipt</span><strong>${esc(s.receipt)}</strong></div><div><span>Event</span><strong>${esc(s.eventName||'Legacy / Master')}</strong></div><div><span>Date</span><strong>${new Date(s.createdAt).toLocaleString('en-SG')}</strong></div><div><span>Payment</span><strong>${esc(s.payment)}</strong></div><div><span>Status</span><strong>${activeSale(s)?(s.updatedAt?'Edited':'Completed'):'Voided'}</strong></div><div><span>Total</span><strong>${money(s.total)}</strong></div></div><div class="receipt-lines">${s.items.map(i=>`<div class="receipt-line"><span>${esc(i.name)} ${i.promo?'<span class="promo-pill">FREE</span>':''}<small>${esc(i.sku)} · × ${i.qty}</small></span><strong>${i.promo?'FREE':money(i.unitPrice*i.qty)}</strong></div>`).join('')}</div>${s.bundleDiscount?`<div class="receipt-line"><span>Bundle discount</span><strong>−${money(s.bundleDiscount)}</strong></div>`:''}`;$('#saleViewDialog').showModal()}
 function editAllowance(s){const a={};const event=eBySale(s);for(const p of db.products)a[p.id]=(event?(event.stock[p.id]||0):p.stock);for(const i of s.items)a[i.productId]=(a[i.productId]||0)+i.qty;return a}function eBySale(s){return s.eventId?eventById(s.eventId):null}
 function openEditSale(id){const s=db.sales.find(x=>x.id===id),ev=eBySale(s);if(!s||!activeSale(s))return;if(ev?.status==='closed')return toast('Closed event sales are view-only');$('#editSaleId').value=id;$('#editSaleReceipt').textContent=`${s.receipt} · ${s.eventName||'Legacy sale'}`;$('#editSalePayment').value=s.payment;editSaleDraft=s.items.filter(i=>!i.promo).map(i=>({productId:i.productId,qty:i.qty}));promoOptions();renderEditSale();$('#saleEditDialog').showModal()}
@@ -264,7 +283,24 @@ async function voidSale(id){
     toast('Sale voided offline · reversal queued');
   }
 }
-function deleteSalePermanently(id){const s=db.sales.find(x=>x.id===id);if(!s)return;const wasActive=activeSale(s);if(!confirm(`Delete ${s.receipt} permanently?\n\nThis removes the line completely. ${wasActive?'Stock will be restored first. ':''}This cannot be undone.`))return;restoreSaleStockForDelete(s);db.sales=db.sales.filter(x=>x.id!==id);db.movements=db.movements.filter(m=>m.receipt!==s.receipt);selectedSaleIds.delete(id);save();renderAll();toast('Sale permanently deleted')}
+async function deleteSalePermanently(id){
+  const s=db.sales.find(x=>x.id===id);
+  if(!s)return;
+  const wasActive=activeSale(s);
+  if(!confirm(`Delete ${s.receipt} permanently?\n\n${wasActive?'Stock will be restored first. ':''}This removes the cloud record too and cannot be undone.`))return;
+  if(wasActive)restoreSaleStockForDelete(s);
+  s.deletedPending=true;
+  s.deletedAt=nowISO();
+  const ps=getPendingSaleIds();ps.delete(id);setPendingSaleIds(ps);
+  const pv=getPendingVoidIds();pv.delete(id);setPendingVoidIds(pv);
+  queueDeleteForCloud(id);
+  save();renderAll();
+  if(cloudSession&&sb&&navigator.onLine){
+    const ok=await syncPendingDeletes(false);
+    if(ok){await pullCloudSales({showToast:false});await refreshCurrentEventInventoryFromCloud();renderAll();toast('Sale permanently deleted')}
+    else toast('Sale hidden locally · cloud delete pending');
+  }else toast('Sale hidden locally · delete queued');
+}
 function deletePastEvent(id){const e=eventById(id);if(!e||e.status!=='closed')return toast('Only closed events can be permanently deleted');const sales=db.sales.filter(s=>s.eventId===e.id);const active=sales.filter(activeSale);if(!confirm(`Delete ${e.name} permanently?\n\nThis will remove the event and its ${sales.length} sale record(s). Active sales will be reversed back into Master Stock. This cannot be undone.`))return;for(const s of active)for(const i of s.items){const p=prod(i.productId);if(p)p.stock+=i.qty}const receipts=new Set(sales.map(s=>s.receipt));db.sales=db.sales.filter(s=>s.eventId!==e.id);db.movements=db.movements.filter(m=>m.eventId!==e.id&&!receipts.has(m.receipt));db.events=db.events.filter(x=>x.id!==e.id);if(db.currentEventId===e.id)db.currentEventId='';save();renderAll();toast('Past event permanently deleted')}
 
 function cloudImageKey(p){const x=p?.image||'';return x.startsWith('data:')?`${x.slice(0,48)}:${x.length}`:x}
@@ -275,7 +311,7 @@ function setPendingProductIds(set){localStorage.setItem(CLOUD_PENDING_KEY,JSON.s
 function captureChangedProducts(){if(!cloudProductSnapshot.size){resetProductCloudSnapshot();return}const pending=getPendingProductIds();for(const p of db.products){const fp=cloudFingerprint(p),old=cloudProductSnapshot.get(p.id);if(old!==undefined&&old!==fp)pending.add(p.id);if(old===undefined)pending.add(p.id)}setPendingProductIds(pending);renderCloudPanel();scheduleCloudProductSync()}
 function scheduleCloudProductSync(){if(cloudSyncTimer)clearTimeout(cloudSyncTimer);if(!navigator.onLine||!cloudSession||!sb)return;cloudSyncTimer=setTimeout(()=>syncPendingProducts(false),1000)}
 function setCloudStatus(text,state='off'){const b=$('#cloudBadge');if(b){b.textContent=text;b.className=`cloud-badge cloud-${state}`}const p=$('#cloudPanelStatus');if(p){p.textContent=text.replace('Cloud: ','');p.className=`status-pill cloud-panel-${state}`}}
-function renderCloudPanel(extra=''){const stats=$('#cloudSyncStats');if(stats){const pending=getPendingProductIds().size;stats.innerHTML=`<span>Local products: <strong>${db.products.length}</strong></span><span>Cloud products: <strong id="cloudCountValue">${window.__cloudProductCount??'—'}</strong></span><span>Pending products: <strong>${pending}</strong></span><span>Pending sales: <strong>${getPendingSaleIds().size}</strong></span><span>Pending voids: <strong>${getPendingVoidIds().size}</strong></span>`}const pr=$('#cloudProgress');if(pr&&extra)pr.textContent=extra;const account=$('#cloudAccountBtn');if(account)account.textContent=cloudSession?.user?.email||'Sign in'}
+function renderCloudPanel(extra=''){const stats=$('#cloudSyncStats');if(stats){const pending=getPendingProductIds().size;stats.innerHTML=`<span>Local products: <strong>${db.products.length}</strong></span><span>Cloud products: <strong id="cloudCountValue">${window.__cloudProductCount??'—'}</strong></span><span>Pending products: <strong>${pending}</strong></span><span>Pending sales: <strong>${getPendingSaleIds().size}</strong></span><span>Pending voids: <strong>${getPendingVoidIds().size}</strong></span><span>Pending deletes: <strong>${getPendingDeleteIds().size}</strong></span>`}const pr=$('#cloudProgress');if(pr&&extra)pr.textContent=extra;const account=$('#cloudAccountBtn');if(account)account.textContent=cloudSession?.user?.email||'Sign in'}
 async function refreshCloudProductCount(){if(!sb||!cloudSession)return;const {count,error}=await sb.from('products').select('*',{count:'exact',head:true});if(!error){window.__cloudProductCount=count||0;renderCloudPanel()}}
 function safeFileName(s){return String(s||'product').replace(/[^a-z0-9_-]+/gi,'-').replace(/^-+|-+$/g,'').toLowerCase()||'product'}
 async function uploadCloudProductImage(p){const src=p.image||'';if(!src||!src.startsWith('data:'))return src||null;const res=await fetch(src);const blob=await res.blob();const ext=blob.type.includes('png')?'png':'jpg';const path=`products/${safeFileName(p.sku)}-${Date.now()}.${ext}`;const {error}=await sb.storage.from('product-images').upload(path,blob,{contentType:blob.type||'image/jpeg',upsert:true});if(error)throw error;const {data}=sb.storage.from('product-images').getPublicUrl(path);return data?.publicUrl||null}
@@ -355,6 +391,9 @@ async function syncMissingProductImages(){
 
 
 
+function getPendingDeleteIds(){try{return new Set(JSON.parse(localStorage.getItem(CLOUD_PENDING_DELETES_KEY)||'[]'))}catch{return new Set()}}
+function setPendingDeleteIds(set){localStorage.setItem(CLOUD_PENDING_DELETES_KEY,JSON.stringify([...set]));renderCloudPanel()}
+function queueDeleteForCloud(id){const q=getPendingDeleteIds();q.add(id);setPendingDeleteIds(q);scheduleCloudSaleSync()}
 function getPendingVoidIds(){try{return new Set(JSON.parse(localStorage.getItem(CLOUD_PENDING_VOIDS_KEY)||'[]'))}catch{return new Set()}}
 function setPendingVoidIds(set){localStorage.setItem(CLOUD_PENDING_VOIDS_KEY,JSON.stringify([...set]));renderCloudPanel()}
 function queueVoidForCloud(id){const q=getPendingVoidIds();q.add(id);setPendingVoidIds(q);scheduleCloudSaleSync()}
@@ -366,7 +405,7 @@ function queueSaleForCloud(id){const q=getPendingSaleIds();q.add(id);setPendingS
 function scheduleCloudSaleSync(){
   clearTimeout(cloudSaleSyncTimer);
   if(!cloudSession||!sb||!navigator.onLine)return;
-  cloudSaleSyncTimer=setTimeout(async()=>{await syncPendingVoids(false);await syncPendingSales(false)},500);
+  cloudSaleSyncTimer=setTimeout(async()=>{await syncPendingDeletes(false);await syncPendingVoids(false);await syncPendingSales(false)},500);
 }
 async function refreshCurrentEventInventoryFromCloud(){
   const ev=currentEvent();
@@ -427,6 +466,41 @@ async function pushSaleToCloud(sale){
   sale.cloudSyncedAt=nowISO();
   setCloudSaleError(sale.id,'');
   persistLocal();
+  return true;
+}
+async function pushDeleteToCloud(sale){
+  if(!sale)return true;
+  if(!sale.cloudId){
+    db.sales=db.sales.filter(x=>x.id!==sale.id);
+    persistLocal();
+    return true;
+  }
+  const {error}=await sb.rpc('delete_pos_sale',{p_sale_id:sale.cloudId,p_local_id:sale.id});
+  if(error)throw error;
+  db.sales=db.sales.filter(x=>x.id!==sale.id);
+  persistLocal();
+  return true;
+}
+async function syncPendingDeletes(showToast=true){
+  if(!cloudSession||!sb){if(showToast)openCloudLogin();return false}
+  if(!navigator.onLine){if(showToast)toast('Offline — deletes are queued safely');return false}
+  const pending=getPendingDeleteIds();
+  if(!pending.size)return true;
+  let failed=[];
+  for(const id of [...pending]){
+    const sale=db.sales.find(s=>s.id===id);
+    if(!sale){pending.delete(id);continue}
+    try{await pushDeleteToCloud(sale);pending.delete(id);setPendingDeleteIds(pending)}
+    catch(e){failed.push(`${sale.receipt||id}: ${formatCloudError(e)}`)}
+  }
+  setPendingDeleteIds(pending);
+  if(failed.length){
+    setCloudStatus('Cloud: deletes pending','warn');
+    const pr=$('#cloudProgress');if(pr)pr.innerHTML=`<strong>Deletes waiting for attention</strong><br>${failed.slice(0,5).map(esc).join('<br>')}`;
+    if(showToast)toast('Some deletes are still pending');
+    return false;
+  }
+  if(showToast)toast('Cloud deletes synced');
   return true;
 }
 async function pushVoidToCloud(sale){
@@ -568,9 +642,12 @@ async function pullCloudSales(options={}){
         items:saleItems
       };
     });
+    const pendingDeletes=getPendingDeleteIds();
+    rebuilt=rebuilt.filter(s=>!pendingDeletes.has(s.id));
     const cloudIds=new Set(rebuilt.map(s=>String(s.id)));
     const unsyncedLocal=db.sales.filter(s=>!s.cloudSynced&&!cloudIds.has(String(s.id)));
-    db.sales=[...unsyncedLocal,...rebuilt].sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
+    const tombstones=db.sales.filter(s=>s.deletedPending&&pendingDeletes.has(s.id));
+    db.sales=[...unsyncedLocal,...tombstones,...rebuilt].sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
     persistLocal();
     renderSales();renderEvents();
     if(options.showToast!==false)toast(`${rebuilt.length} cloud sale${rebuilt.length===1?'':'s'} loaded`);
@@ -920,6 +997,7 @@ async function syncCloudWorkspace(){
     await pullCloudEvents({showToast:false});
   }
   try{await syncPromotionsToCloud();await pullCloudPromotions()}catch(e){console.warn('Promotion cloud sync skipped',e)}
+  await syncPendingDeletes(false);
   await syncPendingVoids(false);
   await syncPendingSales(false);
   await pullCloudSales({showToast:false});
@@ -938,6 +1016,7 @@ function startCloudWorkspacePoller(){
   cloudWorkspacePoller=setInterval(async()=>{
     if(!cloudSession||!sb||!navigator.onLine)return;
     try{
+      await syncPendingDeletes(false);
       await syncPendingVoids(false);
       await syncPendingSales(false);
       await refreshCurrentEventInventoryFromCloud();

@@ -324,3 +324,15 @@ Run SUPABASE_V8_3_SETUP.sql once before using this version.
 - Offline voids are stored in a persistent Pending Voids queue and sync automatically when internet returns.
 - Repeated void-sync attempts are idempotent and cannot double-restore stock.
 - Cloud-synced sales can no longer be permanently deleted from the UI; use Void to preserve audit history.
+
+
+V8.3.1 — CLOUD-SAFE PERMANENT DELETE
+------------------------------------
+Run SUPABASE_V8_3_1_SETUP.sql once before using this build.
+
+- Permanent Delete now removes the sale from Supabase too.
+- Voided sale deletion does not restore stock a second time.
+- Active sale deletion restores stock once before deletion.
+- Offline deletes are queued and hidden locally until Supabase confirms deletion.
+- Pending-delete tombstones suppress automatic cloud pulls, so deleted rows cannot reappear.
+- Bulk Delete uses the same cloud-safe flow.

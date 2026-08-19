@@ -10,11 +10,11 @@
   <title>HeyNikko POS</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
-  <link rel="stylesheet" href="styles.css?v=8.0.2">
+  <link rel="stylesheet" href="styles.css?v=8.0.3">
 </head>
 <body>
 <header>
-  <div><strong>☀️ HeyNikko POS</strong><span id="appVersion" class="version-badge">V8.0.2</span><span id="offlineBadge">Offline ready</span><span id="cloudBadge" class="cloud-badge cloud-off">Cloud: signed out</span><button id="cloudAccountBtn" class="cloud-account-btn" type="button">Sign in</button></div>
+  <div><strong>☀️ HeyNikko POS</strong><span id="appVersion" class="version-badge">V8.0.3</span><span id="offlineBadge">Offline ready</span><span id="cloudBadge" class="cloud-badge cloud-off">Cloud: signed out</span><button id="cloudAccountBtn" class="cloud-account-btn" type="button">Sign in</button></div>
   <nav>
     <button class="tab active" data-view="pos">POS</button>
     <button class="tab" data-view="events">Events</button>
@@ -94,6 +94,7 @@
         <button id="cloudMigrateBtn" class="primary" type="button">Migrate Local Products to Cloud</button>
         <button id="cloudPullBtn" class="ghost" type="button">Pull Products from Cloud</button>
         <button id="cloudSyncBtn" class="ghost" type="button">Sync Pending Products</button>
+        <button id="cloudImageSyncBtn" class="ghost" type="button">Sync Missing Product Images</button>
         <button id="cloudSignOutBtn" class="ghost" type="button">Sign Out</button>
       </div>
       <div id="cloudProgress" class="cloud-progress muted"></div>
@@ -154,4 +155,4 @@
   <p id="cloudLoginError" class="cloud-error"></p>
   <menu><button id="cloudOfflineBtn" type="button" class="ghost">Continue Offline</button><button type="submit" class="primary">Sign In</button></menu>
 </form></dialog>
-<div id="toast"></div><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="app.js?v=8.0.2"></script></body></html>
+<div id="toast"></div><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="app.js?v=8.0.3"></script></body></html>

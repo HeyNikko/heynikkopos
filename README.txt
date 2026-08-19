@@ -179,3 +179,15 @@ V8.0.2 MIGRATION FIX
 - Image upload errors are reported separately as warnings.
 - Cloud product count refreshes after migration so successful database writes are immediately visible.
 - New service-worker cache forces V8.0.2 assets to replace V8.0.1.
+
+
+V8.0.3 IMAGE SYNC FIX
+---------------------
+- Added Export > Cloud Product Sync > "Sync Missing Product Images".
+- Designed for cases where product rows and Master Stock migrated successfully but image_url is blank.
+- Uses product photos still stored in the COMPUTER'S local POS cache.
+- Matches cloud rows by SKU, uploads only missing images to Supabase Storage, then updates products.image_url.
+- Does not recreate products or alter Master Stock.
+- Converts the local computer copy from base64 image data to the resulting cloud image URL after successful upload.
+- Shows exact per-SKU errors if an image upload fails.
+- Run this action on the original computer that still has the product photos, NOT on the iPad.

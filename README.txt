@@ -224,3 +224,46 @@ V8.1.2 — ONE-TOUCH CLOUD SYNC
 - Individual sync buttons remain under "Advanced sync tools" for troubleshooting only.
 - Includes SUPABASE_V8_1_2_SETUP.sql to add/fix missing updated_at columns and force PostgREST schema-cache reload.
 - Promotions and completed Sales are NOT cloud synced yet. They are planned for the next cloud stage.
+
+
+V8.2 — CLOUD SALES + OFFLINE QUEUE + PROMOTIONS
+-----------------------------------------------
+Run SUPABASE_V8_2_SETUP.sql once before using this version.
+
+Cloud source of truth now includes:
+- Products
+- Product images
+- Master Stock
+- Events
+- Event Inventory
+- Promotions
+- Completed Sales
+- Sale Items
+
+SALE WORKFLOW
+-------------
+ONLINE:
+1. Before checkout, POS refreshes the current event stock from Supabase.
+2. Sale is saved locally immediately.
+3. Sale is queued and sent to Supabase automatically.
+4. Supabase atomically checks/decrements event stock and creates the sale + items.
+5. The device refreshes event stock from cloud.
+
+OFFLINE:
+1. Sale is saved locally immediately.
+2. Sale ID is stored in a persistent Pending Sales queue.
+3. When internet returns, pending sales sync automatically.
+4. If cloud stock is insufficient because another device sold the same units, the sale remains pending and the exact error is shown for review.
+
+MULTI-DEVICE:
+- Every 15 seconds while online, each signed-in device refreshes cloud sales and current event inventory.
+- This substantially reduces stale stock between an iPad and phone.
+- Offline devices can still oversell the same last unit independently; V8.2 detects that conflict on reconnect rather than silently overwriting cloud stock.
+
+ONE-TOUCH SYNC:
+- Sync All to Cloud now includes promotions and pending/completed local sales.
+- Pull All from Cloud now includes promotions and sales.
+
+CURRENT LIMITATION:
+- Sale VOID / EDIT / permanent DELETE are still primarily local operations in V8.2.
+  Do not use those as cross-device cloud workflows yet; cloud-safe reversal/edit will be added next.

@@ -264,3 +264,6 @@ select,select.ios-select{color:#332b22!important;-webkit-text-fill-color:#332b22
 .cloud-main-actions .primary{flex:1 1 240px;font-size:16px;padding:14px 18px}
 .cloud-advanced{margin-top:12px;border-top:1px solid var(--line);padding-top:10px}
 .cloud-advanced summary{cursor:pointer;font-weight:800;color:#6c6054;margin-bottom:10px}
+
+.cloud-sales-note{font-size:11px;font-weight:800;color:#8a5a00}
+@media(max-width:700px){.cloud-stats{display:grid;grid-template-columns:1fr 1fr}}

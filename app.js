@@ -2,6 +2,8 @@ const KEY='heynikko_pos_v1';
 const SUPABASE_URL='https://xiwhhbuwwdsaspmlksdo.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY='sb_publishable_3x_4tMedSa7t5ZJR2Z-o1Q_xPFzvYNb';
 const CLOUD_PENDING_KEY='heynikko_pos_v8_pending_products';
+const CLOUD_PENDING_SALES_KEY='heynikko_pos_v8_pending_sales';
+const CLOUD_SALES_ERRORS_KEY='heynikko_pos_v8_sales_errors';
 
 const CATEGORIES=['Stickers','Sticker Sheets','Keychain','Postcard'];
 const DEFAULT_BUNDLES=[
@@ -10,9 +12,9 @@ const DEFAULT_BUNDLES=[
  {id:'bp-keychain',type:'bundle',categories:['Keychain'],qty:3,bundlePrice:15,active:true}
 ];
 const seed={products:[{id:'p1',sku:'BB-ST01',name:'Baobao Sticker',category:'Stickers',price:2.5,stock:100,low:5,image:''},{id:'p2',sku:'SN-ST01',name:'Sunny Sticker',category:'Stickers',price:2.5,stock:80,low:5,image:''}],promos:[],bundlePromos:DEFAULT_BUNDLES,sales:[],movements:[],cart:[],events:[],currentEventId:''};
-let db=load(),pendingProductImage='',editSaleDraft=[],selectedSaleIds=new Set(),sb=null,cloudSession=null,cloudSyncTimer=null,cloudProductSnapshot=new Map(),cloudEventSyncTimer=null;
+let db=load(),pendingProductImage='',editSaleDraft=[],selectedSaleIds=new Set(),sb=null,cloudSession=null,cloudSyncTimer=null,cloudProductSnapshot=new Map(),cloudEventSyncTimer=null,cloudSaleSyncTimer=null,cloudWorkspacePoller=null;
 function load(){try{const raw=JSON.parse(localStorage.getItem(KEY)||'{}'),d={...structuredClone(seed),...raw};d.products=(d.products||[]).map(p=>({...p,image:p.image||'',category:p.category||'',stock:+p.stock||0}));d.promos=(d.promos||[]).map(p=>({...p,type:'gift'}));d.bundlePromos=Array.isArray(raw.bundlePromos)?raw.bundlePromos:structuredClone(DEFAULT_BUNDLES);d.sales=(d.sales||[]).map(s=>({...s,status:s.status||'active',subtotal:s.subtotal??s.total,bundleDiscount:s.bundleDiscount||0,bundlePromos:s.bundlePromos||[],eventId:s.eventId||'',eventName:s.eventName||''}));d.movements=d.movements||[];d.cart=d.cart||[];d.events=(d.events||[]).map(e=>{const x={...e,status:e.status||'open',stock:e.stock||{},opening:e.opening||{},added:e.added||{},returned:e.returned||{},activeProducts:e.activeProducts||{},createdAt:e.createdAt||new Date().toISOString()};if(!Object.keys(x.activeProducts).length){for(const id of new Set([...Object.keys(x.stock),...Object.keys(x.opening),...Object.keys(x.added)]))x.activeProducts[id]=true}return x});d.currentEventId=d.currentEventId||'';return d}catch{return structuredClone(seed)}}
-function persistLocal(){try{localStorage.setItem(KEY,JSON.stringify(db))}catch(e){toast('Storage is full. Export a backup and use smaller images.');throw e}}function save(){persistLocal();try{captureChangedProducts()}catch(e){console.warn('Cloud product change capture skipped',e)}try{scheduleCloudEventSync()}catch(e){console.warn('Cloud event sync schedule skipped',e)}}
+function persistLocal(){try{localStorage.setItem(KEY,JSON.stringify(db))}catch(e){toast('Storage is full. Export a backup and use smaller images.');throw e}}function save(){persistLocal();try{captureChangedProducts()}catch(e){console.warn('Cloud product change capture skipped',e)}try{scheduleCloudEventSync()}catch(e){console.warn('Cloud event sync schedule skipped',e)}try{scheduleCloudSaleSync()}catch(e){console.warn('Cloud sale sync schedule skipped',e)}}
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];const money=n=>new Intl.NumberFormat('en-SG',{style:'currency',currency:'SGD'}).format(Number(n)||0);const nowISO=()=>new Date().toISOString();const uid=p=>p+Date.now().toString(36)+Math.random().toString(36).slice(2,7);function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200)}function prod(id){return db.products.find(p=>p.id===id)}function eventById(id){return db.events.find(e=>e.id===id)}function currentEvent(){const e=eventById(db.currentEventId);return e&&e.status==='open'?e:null}function activeSale(s){return(s.status||'active')!=='voided'}function manualCart(){return db.cart.filter(i=>!i.promo)}
 function productImageHtml(p,cls='product-thumb'){return p?.image?`<img class="${cls}" src="${p.image}" alt="${esc(p.name)}">`:`<div class="${cls} image-placeholder">☀️</div>`}
 function availableStock(id,eventId=db.currentEventId){const e=eventById(eventId);return e&&e.status==='open'?+(e.stock[id]||0):+(prod(id)?.stock||0)}
@@ -74,9 +76,64 @@ function renderCart(){$('#cart').innerHTML=db.cart.length?db.cart.map(r=>{const 
   }
 
 }
-function checkout(method){const e=currentEvent();if(!e)return toast('Select an open event first');if(!db.cart.length)return toast('Cart is empty');for(const r of db.cart){const p=prod(r.productId);if(!p||r.qty>availableStock(r.productId))return toast(`${p?.name||'Item'} has insufficient event stock`)}const pricing=calcBundlePricing(manualCart()),sale={id:uid('S'),receipt:'HN-'+new Date().toISOString().replace(/\D/g,'').slice(2,14),createdAt:nowISO(),updatedAt:null,payment:method,subtotal:pricing.subtotal,bundleDiscount:pricing.discount,bundlePromos:pricing.applied,total:pricing.total,status:'active',eventId:e.id,eventName:e.name,items:[]};for(const r of db.cart){const p=prod(r.productId),unit=r.promo?0:p.price;sale.items.push({productId:p.id,sku:p.sku,name:p.name,category:p.category||'',qty:r.qty,unitPrice:unit,promo:!!r.promo,promoId:r.promoId||''});e.stock[p.id]=(e.stock[p.id]||0)-r.qty;db.movements.push({id:uid('m'),createdAt:nowISO(),productId:p.id,sku:p.sku,name:p.name,delta:-r.qty,scope:'event',eventId:e.id,eventName:e.name,reason:r.promo?'Promo gift':'Sale',receipt:sale.receipt})}db.sales.unshift(sale);db.cart=[];save();renderAll();toast(`${method} sale saved`)}
-function renderProductTable(){const lows=db.products.filter(p=>p.stock<=p.low);$('#lowStockSummary').innerHTML=renderLowStockSummary(lows);$('#productsTable').innerHTML=db.products.map(p=>`<tr><td>${productImageHtml(p,'table-thumb')}</td><td>${esc(p.sku)}</td><td>${esc(p.name)}</td><td>${esc(p.category||'—')}</td><td>${money(p.price)}</td><td class="${p.stock<=p.low?'stock-low':''}">${p.stock}</td><td>${p.low}</td><td><div class="action-row"><button class="ghost" data-edit="${p.id}">Edit</button><button class="ghost" data-stock="${p.id}">Restock / Adjust</button></div></td></tr>`).join('')||'<tr><td colspan="8" class="muted">No products.</td></tr>';$$('[data-edit]').forEach(b=>b.onclick=()=>openProduct(b.dataset.edit));$$('[data-stock]').forEach(b=>b.onclick=()=>openStock(b.dataset.stock))}
-function setImagePreview(src=''){pendingProductImage=src||'';$('#productImagePreview').innerHTML=src?`<img src="${src}" alt="Product preview">`:'<span>No image</span>';$('#removeProductImage').style.display=src?'inline-block':'none'}
+async function checkout(method){
+  const e=currentEvent();
+  if(!e)return toast('Select an open event first');
+  if(!db.cart.length)return toast('Cart is empty');
+
+  // When online, refresh current cloud event stock immediately before payment.
+  if(cloudSession&&sb&&navigator.onLine)await refreshCurrentEventInventoryFromCloud();
+
+  for(const r of db.cart){
+    const p=prod(r.productId);
+    if(!p||r.qty>availableStock(r.productId))return toast(`${p?.name||'Item'} has insufficient event stock`);
+  }
+
+  const pricing=calcBundlePricing(manualCart()),
+    sale={
+      id:uid('S'),
+      receipt:'HN-'+new Date().toISOString().replace(/\D/g,'').slice(2,14),
+      createdAt:nowISO(),
+      updatedAt:null,
+      payment:method,
+      subtotal:pricing.subtotal,
+      bundleDiscount:pricing.discount,
+      bundlePromos:pricing.applied,
+      total:pricing.total,
+      status:'active',
+      eventId:e.id,
+      eventName:e.name,
+      items:[],
+      cloudSynced:false
+    };
+
+  for(const r of db.cart){
+    const p=prod(r.productId),unit=r.promo?0:p.price;
+    sale.items.push({productId:p.id,sku:p.sku,name:p.name,category:p.category||'',qty:r.qty,unitPrice:unit,promo:!!r.promo,promoId:r.promoId||''});
+    e.stock[p.id]=(e.stock[p.id]||0)-r.qty;
+    db.movements.push({id:uid('m'),createdAt:nowISO(),productId:p.id,sku:p.sku,name:p.name,delta:-r.qty,scope:'event',eventId:e.id,eventName:e.name,reason:r.promo?'Promo gift':'Sale',receipt:sale.receipt});
+  }
+
+  db.sales.unshift(sale);
+  db.cart=[];
+  queueSaleForCloud(sale.id);
+  save();
+  renderAll();
+
+  if(navigator.onLine&&cloudSession){
+    toast(`${method} sale saved · syncing…`);
+    const ok=await syncPendingSales(false);
+    if(ok){
+      await refreshCurrentEventInventoryFromCloud();
+      renderAll();
+      toast(`${method} sale saved · cloud synced`);
+    }else{
+      toast(`${method} sale saved locally · cloud sync pending`);
+    }
+  }else{
+    toast(`${method} sale saved offline · queued for sync`);
+  }
+}
 function openProduct(id=''){const p=id?prod(id):null;$('#productDialogTitle').textContent=p?'Edit Product':'Add Product';$('#productId').value=p?.id||'';$('#productSku').value=p?.sku||'';$('#productName').value=p?.name||'';$('#productCategory').value=p?.category||'';$('#productPrice').value=p?.price??'';$('#productStock').value=p?.stock??0;$('#productLow').value=p?.low??5;$('#productImage').value='';setImagePreview(p?.image||'');$('#productDialog').showModal()}
 function resizeImage(file,max=700,quality=.78){return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onerror=reject;reader.onload=()=>{const img=new Image();img.onerror=reject;img.onload=()=>{let w=img.width,h=img.height;if(Math.max(w,h)>max){const r=max/Math.max(w,h);w=Math.round(w*r);h=Math.round(h*r)}const c=document.createElement('canvas');c.width=w;c.height=h;const ctx=c.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);ctx.drawImage(img,0,0,w,h);resolve(c.toDataURL('image/jpeg',quality))};img.src=reader.result};reader.readAsDataURL(file)})}
 async function handleProductImage(e){const f=e.target.files?.[0];if(!f)return;if(!f.type.startsWith('image/'))return toast('Please choose an image');try{setImagePreview(await resizeImage(f));toast('Image ready')}catch{toast('Could not process image')}}
@@ -136,7 +193,7 @@ function togglePromoFields(){const gift=$('#promoType').value==='gift';$('#giftP
 function openPromo(){promoOptions();$('#promoType').value='bundle';togglePromoFields();$$('#promoCategoryChecks input').forEach(x=>x.checked=false);$('#bundleQty').value=5;$('#bundlePrice').value=10;$('#promoDialog').showModal()}
 function savePromoForm(e){e.preventDefault();if($('#promoType').value==='bundle'){const categories=$$('#promoCategoryChecks input:checked').map(x=>x.value);if(!categories.length)return toast('Choose at least one category');db.bundlePromos.push({id:uid('bp'),type:'bundle',categories,qty:+$('#bundleQty').value,bundlePrice:+$('#bundlePrice').value,active:true})}else db.promos.push({id:uid('pr'),type:'gift',buy:$('#promoBuy').value,buyQty:+$('#promoBuyQty').value,gift:$('#promoGift').value,giftQty:+$('#promoGiftQty').value,active:true});save();$('#promoDialog').close();recalcPromos();renderAll();toast('Promotion saved')}
 function updateSalesBulkControls(){selectedSaleIds=new Set([...selectedSaleIds].filter(id=>db.sales.some(s=>s.id===id)));const n=selectedSaleIds.size,count=$('#salesSelectedCount'),del=$('#deleteSelectedSales'),head=$('#salesHeaderCheck');if(count)count.textContent=`${n} selected`;if(del)del.disabled=!n;if(head){head.checked=db.sales.length>0&&n===db.sales.length;head.indeterminate=n>0&&n<db.sales.length}}
-function renderSales(){const today=new Date(),todayKey=today.toDateString(),active=db.sales.filter(activeSale),tod=active.filter(s=>new Date(s.createdAt).toDateString()===todayKey),sum=a=>a.reduce((n,s)=>n+s.total,0);$('#salesSummary').innerHTML=`<div class="stat"><span>Today · ${today.toLocaleDateString('en-SG',{day:'numeric',month:'short',year:'numeric'})}</span><strong>${money(sum(tod))}</strong></div><div class="stat"><span>Transactions</span><strong>${tod.length}</strong></div><div class="stat"><span>All-time</span><strong>${money(sum(active))}</strong></div>`;$('#salesTable').innerHTML=db.sales.map(s=>{const e=eventById(s.eventId),locked=e?.status==='closed',checked=selectedSaleIds.has(s.id)?'checked':'';return`<tr class="${activeSale(s)?'':'voided-row'}"><td class="select-col"><input class="sales-check" type="checkbox" data-sale-select="${s.id}" ${checked} aria-label="Select ${esc(s.receipt)}"></td><td>${new Date(s.createdAt).toLocaleString('en-SG')}</td><td>${esc(s.eventName||'Legacy / Master')}</td><td>${esc(s.payment)}</td><td>${s.items.reduce((a,i)=>a+i.qty,0)}</td><td>${money(s.total)}</td><td><span class="status-pill ${activeSale(s)?'active':'voided'}">${activeSale(s)?(s.updatedAt?'EDITED':'COMPLETED'):'VOIDED'}</span></td><td><div class="action-row"><button class="ghost" data-view-sale="${s.id}">View</button>${activeSale(s)&&!locked?`<button class="ghost" data-edit-sale="${s.id}">Edit</button>`:''}${activeSale(s)?`<button class="danger-btn" data-void-sale="${s.id}">Void</button>`:''}<button class="danger-btn" data-delete-sale="${s.id}">Delete</button></div></td></tr>`}).join('')||'<tr><td colspan="8" class="muted">No sales yet.</td></tr>';$$('[data-sale-select]').forEach(c=>c.onchange=()=>{if(c.checked)selectedSaleIds.add(c.dataset.saleSelect);else selectedSaleIds.delete(c.dataset.saleSelect);updateSalesBulkControls()});$$('[data-view-sale]').forEach(b=>b.onclick=()=>viewSale(b.dataset.viewSale));$$('[data-edit-sale]').forEach(b=>b.onclick=()=>openEditSale(b.dataset.editSale));$$('[data-void-sale]').forEach(b=>b.onclick=()=>voidSale(b.dataset.voidSale));$$('[data-delete-sale]').forEach(b=>b.onclick=()=>deleteSalePermanently(b.dataset.deleteSale));updateSalesBulkControls()}
+function renderSales(){const today=new Date(),todayKey=today.toDateString(),active=db.sales.filter(activeSale),tod=active.filter(s=>new Date(s.createdAt).toDateString()===todayKey),sum=a=>a.reduce((n,s)=>n+s.total,0);$('#salesSummary').innerHTML=`<div class="stat"><span>Today · ${today.toLocaleDateString('en-SG',{day:'numeric',month:'short',year:'numeric'})}</span><strong>${money(sum(tod))}</strong></div><div class="stat"><span>Transactions</span><strong>${tod.length}</strong></div><div class="stat"><span>All-time</span><strong>${money(sum(active))}</strong></div>`;$('#salesTable').innerHTML=db.sales.map(s=>{const e=eventById(s.eventId),locked=e?.status==='closed',checked=selectedSaleIds.has(s.id)?'checked':'';return`<tr class="${activeSale(s)?'':'voided-row'}"><td class="select-col"><input class="sales-check" type="checkbox" data-sale-select="${s.id}" ${checked} aria-label="Select ${esc(s.receipt)}"></td><td>${new Date(s.createdAt).toLocaleString('en-SG')}</td><td>${esc(s.eventName||'Legacy / Master')}</td><td>${esc(s.payment)}</td><td>${s.items.reduce((a,i)=>a+i.qty,0)}</td><td>${money(s.total)}</td><td><span class="status-pill ${activeSale(s)?'active':'voided'}">${activeSale(s)?(s.updatedAt?'EDITED':'COMPLETED'):'VOIDED'}${activeSale(s)&&!s.cloudSynced?' · SYNC PENDING':''}</span></td><td><div class="action-row"><button class="ghost" data-view-sale="${s.id}">View</button>${activeSale(s)&&!locked?`<button class="ghost" data-edit-sale="${s.id}">Edit</button>`:''}${activeSale(s)?`<button class="danger-btn" data-void-sale="${s.id}">Void</button>`:''}<button class="danger-btn" data-delete-sale="${s.id}">Delete</button></div></td></tr>`}).join('')||'<tr><td colspan="8" class="muted">No sales yet.</td></tr>';$$('[data-sale-select]').forEach(c=>c.onchange=()=>{if(c.checked)selectedSaleIds.add(c.dataset.saleSelect);else selectedSaleIds.delete(c.dataset.saleSelect);updateSalesBulkControls()});$$('[data-view-sale]').forEach(b=>b.onclick=()=>viewSale(b.dataset.viewSale));$$('[data-edit-sale]').forEach(b=>b.onclick=()=>openEditSale(b.dataset.editSale));$$('[data-void-sale]').forEach(b=>b.onclick=()=>voidSale(b.dataset.voidSale));$$('[data-delete-sale]').forEach(b=>b.onclick=()=>deleteSalePermanently(b.dataset.deleteSale));updateSalesBulkControls()}
 function restoreSaleStockForDelete(s){const ev=eBySale(s);if(!activeSale(s))return;for(const i of s.items){const p=prod(i.productId);if(!p)continue;if(ev&&ev.status==='open'){ev.stock[p.id]=(ev.stock[p.id]||0)+i.qty;ev.activeProducts[p.id]=true}else p.stock+=i.qty}}
 function bulkDeleteSelectedSales(){const ids=[...selectedSaleIds].filter(id=>db.sales.some(s=>s.id===id));if(!ids.length)return toast('Select at least one sale');const sales=ids.map(id=>db.sales.find(s=>s.id===id)).filter(Boolean),activeCount=sales.filter(activeSale).length;if(!confirm(`Delete ${sales.length} selected sale${sales.length===1?'':'s'} permanently?\n\n${activeCount?`${activeCount} active sale${activeCount===1?'':'s'} will have stock restored first.\n`:''}This cannot be undone.`))return;const receipts=new Set();for(const s of sales){restoreSaleStockForDelete(s);receipts.add(s.receipt)}const idSet=new Set(ids);db.sales=db.sales.filter(s=>!idSet.has(s.id));db.movements=db.movements.filter(m=>!receipts.has(m.receipt));selectedSaleIds.clear();save();renderAll();toast(`${sales.length} sale${sales.length===1?'':'s'} permanently deleted`)}
 function viewSale(id){const s=db.sales.find(x=>x.id===id);if(!s)return;$('#saleViewContent').innerHTML=`<div class="receipt-meta"><div><span>Receipt</span><strong>${esc(s.receipt)}</strong></div><div><span>Event</span><strong>${esc(s.eventName||'Legacy / Master')}</strong></div><div><span>Date</span><strong>${new Date(s.createdAt).toLocaleString('en-SG')}</strong></div><div><span>Payment</span><strong>${esc(s.payment)}</strong></div><div><span>Status</span><strong>${activeSale(s)?(s.updatedAt?'Edited':'Completed'):'Voided'}</strong></div><div><span>Total</span><strong>${money(s.total)}</strong></div></div><div class="receipt-lines">${s.items.map(i=>`<div class="receipt-line"><span>${esc(i.name)} ${i.promo?'<span class="promo-pill">FREE</span>':''}<small>${esc(i.sku)} · × ${i.qty}</small></span><strong>${i.promo?'FREE':money(i.unitPrice*i.qty)}</strong></div>`).join('')}</div>${s.bundleDiscount?`<div class="receipt-line"><span>Bundle discount</span><strong>−${money(s.bundleDiscount)}</strong></div>`:''}`;$('#saleViewDialog').showModal()}
@@ -157,7 +214,7 @@ function setPendingProductIds(set){localStorage.setItem(CLOUD_PENDING_KEY,JSON.s
 function captureChangedProducts(){if(!cloudProductSnapshot.size){resetProductCloudSnapshot();return}const pending=getPendingProductIds();for(const p of db.products){const fp=cloudFingerprint(p),old=cloudProductSnapshot.get(p.id);if(old!==undefined&&old!==fp)pending.add(p.id);if(old===undefined)pending.add(p.id)}setPendingProductIds(pending);renderCloudPanel();scheduleCloudProductSync()}
 function scheduleCloudProductSync(){if(cloudSyncTimer)clearTimeout(cloudSyncTimer);if(!navigator.onLine||!cloudSession||!sb)return;cloudSyncTimer=setTimeout(()=>syncPendingProducts(false),1000)}
 function setCloudStatus(text,state='off'){const b=$('#cloudBadge');if(b){b.textContent=text;b.className=`cloud-badge cloud-${state}`}const p=$('#cloudPanelStatus');if(p){p.textContent=text.replace('Cloud: ','');p.className=`status-pill cloud-panel-${state}`}}
-function renderCloudPanel(extra=''){const stats=$('#cloudSyncStats');if(stats){const pending=getPendingProductIds().size;stats.innerHTML=`<span>Local products: <strong>${db.products.length}</strong></span><span>Cloud products: <strong id="cloudCountValue">${window.__cloudProductCount??'—'}</strong></span><span>Pending: <strong>${pending}</strong></span>`}const pr=$('#cloudProgress');if(pr&&extra)pr.textContent=extra;const account=$('#cloudAccountBtn');if(account)account.textContent=cloudSession?.user?.email||'Sign in'}
+function renderCloudPanel(extra=''){const stats=$('#cloudSyncStats');if(stats){const pending=getPendingProductIds().size;stats.innerHTML=`<span>Local products: <strong>${db.products.length}</strong></span><span>Cloud products: <strong id="cloudCountValue">${window.__cloudProductCount??'—'}</strong></span><span>Pending products: <strong>${pending}</strong></span><span>Pending sales: <strong>${getPendingSaleIds().size}</strong></span>`}const pr=$('#cloudProgress');if(pr&&extra)pr.textContent=extra;const account=$('#cloudAccountBtn');if(account)account.textContent=cloudSession?.user?.email||'Sign in'}
 async function refreshCloudProductCount(){if(!sb||!cloudSession)return;const {count,error}=await sb.from('products').select('*',{count:'exact',head:true});if(!error){window.__cloudProductCount=count||0;renderCloudPanel()}}
 function safeFileName(s){return String(s||'product').replace(/[^a-z0-9_-]+/gi,'-').replace(/^-+|-+$/g,'').toLowerCase()||'product'}
 async function uploadCloudProductImage(p){const src=p.image||'';if(!src||!src.startsWith('data:'))return src||null;const res=await fetch(src);const blob=await res.blob();const ext=blob.type.includes('png')?'png':'jpg';const path=`products/${safeFileName(p.sku)}-${Date.now()}.${ext}`;const {error}=await sb.storage.from('product-images').upload(path,blob,{contentType:blob.type||'image/jpeg',upsert:true});if(error)throw error;const {data}=sb.storage.from('product-images').getPublicUrl(path);return data?.publicUrl||null}
@@ -235,6 +292,178 @@ async function syncMissingProductImages(){
   toast(failed.length?'Some images could not sync':'Product images synced');
 }
 
+
+
+function getPendingSaleIds(){try{return new Set(JSON.parse(localStorage.getItem(CLOUD_PENDING_SALES_KEY)||'[]'))}catch{return new Set()}}
+function setPendingSaleIds(set){localStorage.setItem(CLOUD_PENDING_SALES_KEY,JSON.stringify([...set]));renderCloudPanel()}
+function getCloudSaleErrors(){try{return JSON.parse(localStorage.getItem(CLOUD_SALES_ERRORS_KEY)||'{}')}catch{return{}}}
+function setCloudSaleError(id,msg){const x=getCloudSaleErrors();if(msg)x[id]=msg;else delete x[id];localStorage.setItem(CLOUD_SALES_ERRORS_KEY,JSON.stringify(x))}
+function queueSaleForCloud(id){const q=getPendingSaleIds();q.add(id);setPendingSaleIds(q);scheduleCloudSaleSync()}
+function scheduleCloudSaleSync(){
+  clearTimeout(cloudSaleSyncTimer);
+  if(!cloudSession||!sb||!navigator.onLine)return;
+  cloudSaleSyncTimer=setTimeout(()=>syncPendingSales(false),500);
+}
+async function refreshCurrentEventInventoryFromCloud(){
+  const ev=currentEvent();
+  if(!ev||!ev.cloudId||!cloudSession||!sb||!navigator.onLine)return false;
+  const {data,error}=await sb.from('event_inventory')
+    .select('product_id,current_qty,active')
+    .eq('event_id',ev.cloudId);
+  if(error){console.warn('Event stock refresh failed',error);return false}
+  for(const row of data||[]){
+    const pid=localProductIdFromCloudId(row.product_id);
+    if(!pid)continue;
+    ev.stock[pid]=Number(row.current_qty||0);
+    ev.activeProducts[pid]=row.active!==false;
+  }
+  persistLocal();
+  renderProducts();renderEventBanner();renderEvents();
+  return true;
+}
+async function buildCloudSaleItems(sale){
+  const items=[];
+  for(const i of sale.items||[]){
+    const p=prod(i.productId);
+    const cloudProductId=p?.cloudId||null;
+    if(!cloudProductId)throw new Error(`${i.sku||i.name}: product has not synced to cloud`);
+    items.push({
+      product_id:cloudProductId,
+      sku:i.sku||p?.sku||'',
+      product_name:i.name||p?.name||'',
+      quantity:Number(i.qty)||0,
+      unit_price:Number(i.unitPrice)||0,
+      line_total:(Number(i.qty)||0)*(Number(i.unitPrice)||0),
+      promo:!!i.promo,
+      promo_id:i.promoId||''
+    });
+  }
+  return items;
+}
+async function pushSaleToCloud(sale){
+  if(!sale||!activeSale(sale))return true;
+  const ev=eventById(sale.eventId);
+  if(!ev?.cloudId)throw new Error(`Event "${sale.eventName||''}" has not synced to cloud`);
+  const items=await buildCloudSaleItems(sale);
+  const {data,error}=await sb.rpc('record_pos_sale',{
+    p_local_id:sale.id,
+    p_receipt:sale.receipt,
+    p_event_id:ev.cloudId,
+    p_event_name:sale.eventName||ev.name,
+    p_payment_method:sale.payment||'',
+    p_subtotal:Number(sale.subtotal??sale.total)||0,
+    p_discount:Number(sale.bundleDiscount||0),
+    p_total:Number(sale.total)||0,
+    p_created_at:sale.createdAt||nowISO(),
+    p_items:items
+  });
+  if(error)throw error;
+  sale.cloudSynced=true;
+  sale.cloudId=data?.sale_id||sale.cloudId||'';
+  sale.cloudSyncedAt=nowISO();
+  setCloudSaleError(sale.id,'');
+  persistLocal();
+  return true;
+}
+async function syncPendingSales(showToast=true){
+  if(!cloudSession||!sb){if(showToast)openCloudLogin();return false}
+  if(!navigator.onLine){if(showToast)toast('Offline — sales are safely queued on this device');return false}
+  const pending=getPendingSaleIds();
+  if(!pending.size){if(showToast)toast('No pending sales');return true}
+  setCloudStatus('Cloud: syncing sales','syncing');
+  let ok=0,failed=[];
+  for(const id of [...pending]){
+    const sale=db.sales.find(s=>s.id===id);
+    if(!sale){pending.delete(id);continue}
+    try{
+      if(!activeSale(sale)){
+        pending.delete(id);continue;
+      }
+      await pushSaleToCloud(sale);
+      pending.delete(id);ok++;
+      setPendingSaleIds(pending);
+    }catch(e){
+      const msg=formatCloudError(e);
+      setCloudSaleError(id,msg);
+      failed.push(`${sale.receipt||id}: ${msg}`);
+    }
+  }
+  setPendingSaleIds(pending);
+  if(failed.length){
+    setCloudStatus('Cloud: sales pending','warn');
+    const pr=$('#cloudProgress');
+    if(pr)pr.innerHTML=`<strong>Sales waiting for attention</strong><br>${failed.slice(0,5).map(esc).join('<br>')}${failed.length>5?`<br>…and ${failed.length-5} more`:''}`;
+    if(showToast)toast(`${failed.length} sale${failed.length===1?'':'s'} still pending`);
+    return false;
+  }
+  setCloudStatus('Cloud: synced','on');
+  renderCloudPanel(`Sales synced: ${ok}. Pending sales: 0.`);
+  if(showToast)toast(`${ok} sale${ok===1?'':'s'} synced`);
+  return true;
+}
+async function fetchCloudSales(){
+  const {data:sales,error:salesErr}=await sb.from('sales')
+    .select('*').order('created_at',{ascending:false});
+  if(salesErr)throw salesErr;
+  const {data:items,error:itemsErr}=await sb.from('sale_items').select('*');
+  if(itemsErr)throw itemsErr;
+  return {sales:sales||[],items:items||[]};
+}
+async function pullCloudSales(options={}){
+  if(!cloudSession||!sb)return false;
+  if(!navigator.onLine)return false;
+  try{
+    const {sales,items}=await fetchCloudSales();
+    const localById=new Map(db.sales.map(s=>[String(s.id),s]));
+    const rebuilt=sales.map(r=>{
+      const old=localById.get(String(r.local_id||''));
+      const ev=db.events.find(e=>String(e.cloudId||'')===String(r.event_id||''));
+      const saleItems=items.filter(i=>String(i.sale_id)===String(r.id)).map(i=>{
+        const pid=localProductIdFromCloudId(i.product_id);
+        return{
+          productId:pid||'',
+          sku:i.sku||'',
+          name:i.product_name||'',
+          category:prod(pid)?.category||'',
+          qty:Number(i.quantity)||0,
+          unitPrice:Number(i.unit_price)||0,
+          promo:!!i.promo,
+          promoId:i.promo_id||''
+        };
+      });
+      return{
+        ...(old||{}),
+        id:old?.id||r.local_id||`cloud_sale_${r.id}`,
+        cloudId:r.id,
+        cloudSynced:true,
+        receipt:r.receipt||old?.receipt||'',
+        createdAt:r.created_at,
+        updatedAt:r.updated_at||null,
+        payment:r.payment_method||'',
+        subtotal:Number(r.subtotal)||0,
+        bundleDiscount:Number(r.discount)||0,
+        bundlePromos:old?.bundlePromos||[],
+        total:Number(r.total)||0,
+        status:r.status==='voided'?'voided':'active',
+        voidedAt:r.voided_at||'',
+        eventId:ev?.id||old?.eventId||'',
+        eventName:r.event_name||ev?.name||'',
+        items:saleItems
+      };
+    });
+    const cloudIds=new Set(rebuilt.map(s=>String(s.id)));
+    const unsyncedLocal=db.sales.filter(s=>!s.cloudSynced&&!cloudIds.has(String(s.id)));
+    db.sales=[...unsyncedLocal,...rebuilt].sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
+    persistLocal();
+    renderSales();renderEvents();
+    if(options.showToast!==false)toast(`${rebuilt.length} cloud sale${rebuilt.length===1?'':'s'} loaded`);
+    return true;
+  }catch(e){
+    console.error('Cloud sales pull failed',e);
+    if(options.showToast!==false)toast(`Sales pull failed: ${formatCloudError(e)}`);
+    return false;
+  }
+}
 
 function scheduleCloudEventSync(){
   clearTimeout(cloudEventSyncTimer);
@@ -376,6 +605,28 @@ async function pullCloudEvents(options={}){
   }
 }
 
+
+async function syncPromotionsToCloud(){
+  if(!cloudSession||!sb||!navigator.onLine)return false;
+  const rows=[];
+  for(const p of db.bundlePromos||[])rows.push({local_id:p.id,promo_kind:'bundle',payload:p,active:p.active!==false,updated_at:nowISO()});
+  for(const p of db.promos||[])rows.push({local_id:p.id,promo_kind:'gift',payload:p,active:p.active!==false,updated_at:nowISO()});
+  if(!rows.length)return true;
+  const {error}=await sb.from('promotions').upsert(rows,{onConflict:'local_id'});
+  if(error)throw error;
+  return true;
+}
+async function pullCloudPromotions(){
+  if(!cloudSession||!sb||!navigator.onLine)return false;
+  const {data,error}=await sb.from('promotions').select('local_id,promo_kind,payload,active');
+  if(error)throw error;
+  if(!data?.length)return true;
+  db.bundlePromos=data.filter(r=>r.promo_kind==='bundle').map(r=>({...r.payload,id:r.local_id,active:r.active!==false}));
+  db.promos=data.filter(r=>r.promo_kind==='gift').map(r=>({...r.payload,id:r.local_id,active:r.active!==false}));
+  persistLocal();renderPromos();renderCart();
+  return true;
+}
+
 async function syncAllToCloud(){
   if(!cloudSession||!sb)return openCloudLogin();
   if(!navigator.onLine)return toast('Internet connection required to sync');
@@ -406,6 +657,13 @@ async function syncAllToCloud(){
     // 3) Push all events + event inventory.
     eventOk=await syncEventsToCloud(false);
 
+    // 4) Promotions must match across checkout devices.
+    await syncPromotionsToCloud();
+
+    // 5) Upload any locally-created sales that are still pending.
+    for(const s of db.sales)if(activeSale(s)&&!s.cloudSynced)queueSaleForCloud(s.id);
+    await syncPendingSales(false);
+
     await refreshCloudProductCount();
 
     const problems=productErrors.length+imageErrors.length+(eventOk?0:1);
@@ -421,7 +679,7 @@ async function syncAllToCloud(){
       toast('Full cloud sync completed with issues');
     }else{
       setCloudStatus('Cloud: synced','on');
-      renderCloudPanel(`Full sync complete: ${db.products.length} products + ${db.events.length} events uploaded.`);
+      renderCloudPanel(`Full sync complete: ${db.products.length} products + ${db.events.length} events + promotions + sales uploaded.`);
       toast('Everything supported is synced to cloud');
     }
   }catch(e){
@@ -456,8 +714,11 @@ async function pullAllFromCloud(){
   try{
     await pullCloudProducts({auto:true});
     await pullCloudEvents({showToast:false});
+    await pullCloudPromotions();
+    await pullCloudSales({showToast:false});
+    await refreshCurrentEventInventoryFromCloud();
     setCloudStatus('Cloud: synced','on');
-    renderCloudPanel(`Pull complete: ${db.products.length} products + ${db.events.length} events loaded on this device.`);
+    renderCloudPanel(`Pull complete: ${db.products.length} products + ${db.events.length} events + promotions + ${db.sales.length} sales loaded.`);
     toast('Cloud workspace loaded');
   }catch(e){
     setCloudStatus('Cloud: pull issue','warn');
@@ -476,6 +737,10 @@ async function syncCloudWorkspace(){
   }else{
     await pullCloudEvents({showToast:false});
   }
+  try{await syncPromotionsToCloud();await pullCloudPromotions()}catch(e){console.warn('Promotion cloud sync skipped',e)}
+  await syncPendingSales(false);
+  await pullCloudSales({showToast:false});
+  await refreshCurrentEventInventoryFromCloud();
 }
 
 async function fetchCloudProducts(){if(!cloudSession||!sb)throw new Error('Sign in first');const {data,error}=await sb.from('products').select('id,sku,name,category,price,image_url,master_qty,low_stock_at,active,updated_at').order('name');if(error)throw error;return data||[]}
@@ -484,14 +749,27 @@ async function maybeAutoPullCloudProducts(){if(!cloudSession||!sb||!navigator.on
 function openCloudLogin(){const d=$('#cloudLoginDialog');if(!d)return;if(cloudSession)return toast('Already signed in');$('#cloudLoginError').textContent='';if(!d.open)d.showModal()}
 async function cloudLoginSubmit(e){if(e){e.preventDefault();e.stopPropagation()}if(!sb){$('#cloudLoginError').textContent='Supabase library could not load. Check your internet connection.';return false}const form=$('#cloudLoginForm'),submit=form?.querySelector('button[type=submit]'),email=$('#cloudEmail').value.trim(),password=$('#cloudPassword').value;if(submit)submit.disabled=true;$('#cloudLoginError').textContent='Signing in…';try{const {data,error}=await sb.auth.signInWithPassword({email,password});if(error){$('#cloudLoginError').textContent=error.message;return false}cloudSession=data.session;$('#cloudPassword').value='';$('#cloudLoginError').textContent='';if($('#cloudLoginDialog').open)$('#cloudLoginDialog').close();setCloudStatus('Cloud: synced','on');renderCloudPanel('Signed in successfully.');await syncCloudWorkspace();toast('Cloud signed in');return false}catch(err){console.error(err);$('#cloudLoginError').textContent='Could not sign in. Please try again.';return false}finally{if(submit)submit.disabled=false}}
 async function cloudSignOut(){if(sb)await sb.auth.signOut();cloudSession=null;setCloudStatus('Cloud: signed out','off');renderCloudPanel('Local offline data remains on this device.');toast('Signed out of cloud')}
-async function initCloud(){resetProductCloudSnapshot();renderCloudPanel();if(!window.supabase){setCloudStatus('Cloud: unavailable','warn');renderCloudPanel('Supabase library unavailable. Local POS still works offline.');return}sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}});const {data}=await sb.auth.getSession();cloudSession=data?.session||null;sb.auth.onAuthStateChange((event,session)=>{cloudSession=session||null;if(cloudSession){setCloudStatus('Cloud: synced','on');renderCloudPanel();scheduleCloudProductSync()}else{setCloudStatus('Cloud: signed out','off');renderCloudPanel()}});if(cloudSession){setCloudStatus('Cloud: synced','on');renderCloudPanel();await syncCloudWorkspace()}else{setCloudStatus('Cloud: signed out','off');renderCloudPanel();if(navigator.onLine)setTimeout(openCloudLogin,350)}}
+
+function startCloudWorkspacePoller(){
+  clearInterval(cloudWorkspacePoller);
+  cloudWorkspacePoller=setInterval(async()=>{
+    if(!cloudSession||!sb||!navigator.onLine)return;
+    try{
+      await syncPendingSales(false);
+      await refreshCurrentEventInventoryFromCloud();
+      await pullCloudSales({showToast:false});
+    }catch(e){console.warn('Background cloud refresh skipped',e)}
+  },15000);
+}
+
+async function initCloud(){resetProductCloudSnapshot();renderCloudPanel();if(!window.supabase){setCloudStatus('Cloud: unavailable','warn');renderCloudPanel('Supabase library unavailable. Local POS still works offline.');return}sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}});const {data}=await sb.auth.getSession();cloudSession=data?.session||null;sb.auth.onAuthStateChange((event,session)=>{cloudSession=session||null;if(cloudSession){setCloudStatus('Cloud: synced','on');renderCloudPanel();scheduleCloudProductSync();startCloudWorkspacePoller()}else{clearInterval(cloudWorkspacePoller);setCloudStatus('Cloud: signed out','off');renderCloudPanel()}});if(cloudSession){setCloudStatus('Cloud: synced','on');renderCloudPanel();await syncCloudWorkspace();startCloudWorkspacePoller()}else{setCloudStatus('Cloud: signed out','off');renderCloudPanel();if(navigator.onLine)setTimeout(openCloudLogin,350)}}
 
 function renderAll(){renderEventBanner();renderProducts();renderCart();renderProductTable();renderEvents();renderPromos();renderSales()}
 function switchView(name){$$('.tab').forEach(x=>x.classList.toggle('active',x.dataset.view===name));$$('.view').forEach(v=>v.classList.toggle('active',v.id===`view-${name}`));renderAll()}
 const te=new TextEncoder();function crc32(bytes){let c=-1;for(const b of bytes){c^=b;for(let k=0;k<8;k++)c=(c>>>1)^((c&1)?0xEDB88320:0)}return(c^-1)>>>0}function u16(n){return[n&255,(n>>>8)&255]}function u32(n){return[n&255,(n>>>8)&255,(n>>>16)&255,(n>>>24)&255]}function zipStore(files){let parts=[],central=[],offset=0;for(const[name,text]of Object.entries(files)){const nb=te.encode(name),data=te.encode(text),crc=crc32(data),local=new Uint8Array([80,75,3,4,20,0,0,0,0,0,0,0,0,0,...u32(crc),...u32(data.length),...u32(data.length),...u16(nb.length),0,0]);parts.push(local,nb,data);const cen=new Uint8Array([80,75,1,2,20,0,20,0,0,0,0,0,0,0,0,0,...u32(crc),...u32(data.length),...u32(data.length),...u16(nb.length),0,0,0,0,0,0,0,0,0,0,0,0,...u32(offset)]);central.push(cen,nb);offset+=local.length+nb.length+data.length}const centralSize=central.reduce((s,a)=>s+a.length,0),end=new Uint8Array([80,75,5,6,0,0,0,0,...u16(Object.keys(files).length),...u16(Object.keys(files).length),...u32(centralSize),...u32(offset),0,0]);return new Blob([...parts,...central,end],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})}function xml(s){return String(s??'').replace(/[<>&'\"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;',"'":'&apos;','"':'&quot;'}[c]))}function colName(n){let s='';while(n){n--;s=String.fromCharCode(65+n%26)+s;n=Math.floor(n/26)}return s}function sheetXml(rows){return`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${rows.map((r,ri)=>`<row r="${ri+1}">${r.map((v,ci)=>{const ref=colName(ci+1)+(ri+1);if(typeof v==='number'&&Number.isFinite(v))return`<c r="${ref}"><v>${v}</v></c>`;return`<c r="${ref}" t="inlineStr"><is><t>${xml(v)}</t></is></c>`}).join('')}</row>`).join('')}</sheetData></worksheet>`}
 function workbookData(mode='all'){let sales=db.sales;if(mode==='today')sales=sales.filter(s=>new Date(s.createdAt).toDateString()===new Date().toDateString());if(mode==='event'){const e=currentEvent();sales=e?db.sales.filter(s=>s.eventId===e.id):[]}const eventRows=db.events.map(e=>[e.name,e.start,e.end,e.status,new Date(e.createdAt).toLocaleString('en-SG'),e.closedAt?new Date(e.closedAt).toLocaleString('en-SG'):'',eventRevenue(e),eventUnitsSold(e)]),eventInv=[];for(const e of db.events)for(const p of db.products){const initial=e.opening[p.id]||0,added=e.added[p.id]||0,returned=e.returned[p.id]||0,sold=eventSales(e).reduce((n,s)=>n+s.items.filter(i=>i.productId===p.id).reduce((a,i)=>a+i.qty,0),0);if(initial||added||returned||sold||(e.stock[p.id]||0))eventInv.push([e.name,e.status,p.sku,p.name,p.category||'',initial,added,sold,e.stock[p.id]||0,returned])}return[['Sales',[['Receipt','Event','Date/Time','Payment','Subtotal','Bundle Discount','Total','Status'],...sales.map(s=>[s.receipt,s.eventName||'Legacy / Master',new Date(s.createdAt).toLocaleString('en-SG'),s.payment,s.subtotal??s.total,s.bundleDiscount||0,s.total,activeSale(s)?(s.updatedAt?'Edited':'Completed'):'Voided'])]],['Items Sold',[['Receipt','Event','Status','SKU','Product','Category','Qty','Unit Price','Free Gift'],...sales.flatMap(s=>s.items.map(i=>[s.receipt,s.eventName||'Legacy / Master',activeSale(s)?'Active':'Voided',i.sku,i.name,i.category||'',i.qty,i.unitPrice,i.promo?'Yes':'No']))]],['Master Inventory',[['SKU','Product','Category','Price','Master Available','Low Stock Alert'],...db.products.map(p=>[p.sku,p.name,p.category||'',p.price,p.stock,p.low])]],['Events',[['Event','Start','End','Status','Created','Closed','Sales','Units Sold'],...eventRows]],['Event Inventory',[['Event','Status','SKU','Product','Category','Initial','Added','Sold','Event Left','Returned to Master'],...eventInv]],['Promotions',[['Type','Applies To','Quantity','Bundle Price','Free Gift','Gift Qty','Active'],...db.bundlePromos.map(pr=>['Bundle price',(pr.categories||[]).join(' + '),pr.qty,pr.bundlePrice,'','',pr.active?'Yes':'No']),...db.promos.map(pr=>{const b=prod(pr.buy),g=prod(pr.gift);return['Free gift',`${b?.sku||''} ${b?.name||''}`,pr.buyQty,'',`${g?.sku||''} ${g?.name||''}`,pr.giftQty,pr.active?'Yes':'No']})]],['Stock Movements',[['Date/Time','Scope','Event','SKU','Product','Change','Reason','Receipt'],...db.movements.map(m=>[new Date(m.createdAt).toLocaleString('en-SG'),m.scope||'master',m.eventName||'',m.sku,m.name,m.delta,m.reason,m.receipt||''])]]]}
 function exportXlsx(mode='all'){if(mode==='event'&&!currentEvent())return toast('Select an open event first');const sheets=workbookData(mode),files={};files['[Content_Types].xml']=`<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>${sheets.map((_,i)=>`<Override PartName="/xl/worksheets/sheet${i+1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')}</Types>`;files['_rels/.rels']=`<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`;files['xl/workbook.xml']=`<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${sheets.map((s,i)=>`<sheet name="${xml(s[0])}" sheetId="${i+1}" r:id="rId${i+1}"/>`).join('')}</sheets></workbook>`;files['xl/_rels/workbook.xml.rels']=`<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${sheets.map((_,i)=>`<Relationship Id="rId${i+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i+1}.xml"/>`).join('')}</Relationships>`;sheets.forEach((s,i)=>files[`xl/worksheets/sheet${i+1}.xml`]=sheetXml(s[1]));download(zipStore(files),`HeyNikko_POS_${mode}_${new Date().toISOString().slice(0,10)}.xlsx`)}function download(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000)}function backup(){download(new Blob([JSON.stringify(db,null,2)],{type:'application/json'}),`HeyNikko_POS_Backup_${new Date().toISOString().slice(0,10)}.json`)}
-renderCategoryOptions();resetProductCloudSnapshot();$('#cloudLoginForm').onsubmit=cloudLoginSubmit;$('#cloudOfflineBtn').onclick=()=>{if($('#cloudLoginDialog').open)$('#cloudLoginDialog').close();setCloudStatus('Cloud: offline mode','off');renderCloudPanel('Working from this device only until you sign in.')};$('#cloudAccountBtn').onclick=()=>cloudSession?switchView('export'):openCloudLogin();$('#cloudSyncAllBtn').onclick=syncAllToCloud;$('#cloudPullAllBtn').onclick=pullAllFromCloud;$('#cloudMigrateBtn').onclick=migrateLocalProductsToCloud;$('#cloudPullBtn').onclick=()=>pullCloudProducts();$('#cloudSyncBtn').onclick=()=>syncPendingProducts(true);$('#cloudImageSyncBtn').onclick=syncMissingProductImages;$('#cloudEventPushBtn').onclick=()=>syncEventsToCloud(true);$('#cloudEventPullBtn').onclick=()=>pullCloudEvents({showToast:true});$('#cloudSignOutBtn').onclick=cloudSignOut;$$('.tab').forEach(b=>b.onclick=()=>switchView(b.dataset.view));$('#search').oninput=renderProducts;$('#categoryFilter').onchange=()=>{renderPosCategoryButtons();renderProducts()};$('#clearCart').onclick=()=>{db.cart=[];save();renderCart()};$('#payCash').onclick=()=>checkout('Cash');$('#payPaynow').onclick=()=>checkout('PayNow');$('#addProductBtn').onclick=()=>openProduct();$('#productForm').onsubmit=saveProductForm;$('#productImage').onchange=handleProductImage;$('#removeProductImage').onclick=()=>{setImagePreview('');$('#productImage').value=''};$('#stockForm').onsubmit=saveStockForm;$('#createEventBtn').onclick=openCreateEvent;$('#eventForm').onsubmit=saveEventForm;const cancelEventCreate=$('#cancelEventCreate');if(cancelEventCreate)cancelEventCreate.onclick=()=>$('#eventDialog').close();$('#eventSetupSearch').oninput=e=>{eventDraft.search=e.target.value;renderEventDraft()};$('#eventSetupCategory').onchange=e=>{eventDraft.category=e.target.value;renderEventDraft()};$('#selectVisibleProducts').onclick=()=>setDraftVisible(true);$('#clearVisibleProducts').onclick=()=>setDraftVisible(false);$('#copyEventBtn').onclick=copyPreviousEvent;$('#eventCsvInput').onchange=e=>{importEventCsv(e.target.files[0],'create');e.target.value=''};$('#eventStockForm').onsubmit=saveEventStock;$('#manageSearch').oninput=e=>{manageDraft.search=e.target.value;renderManageDraft()};$('#manageCategory').onchange=e=>{manageDraft.category=e.target.value;renderManageDraft()};$('#manageCsvInput').onchange=e=>{importEventCsv(e.target.files[0],'manage');e.target.value=''};$('#saveManageEvent').onclick=saveManageEvent;$('#addPromoBtn').onclick=openPromo;$('#promoType').onchange=togglePromoFields;$('#promoForm').onsubmit=savePromoForm;$('#refreshSales').onclick=renderSales;$('#selectAllSales').onclick=()=>{selectedSaleIds=new Set(db.sales.map(s=>s.id));renderSales()};$('#clearSalesSelection').onclick=()=>{selectedSaleIds.clear();renderSales()};$('#deleteSelectedSales').onclick=bulkDeleteSelectedSales;$('#salesHeaderCheck').onchange=e=>{selectedSaleIds=e.target.checked?new Set(db.sales.map(s=>s.id)):new Set();renderSales()};$('#saleEditForm').onsubmit=saveSaleEditForm;$('#editAddProductBtn').onclick=addProductToEdit;$$('[data-close-dialog]').forEach(b=>b.onclick=()=>{const d=$('#'+b.dataset.closeDialog);if(d&&d.open)d.close()});$('#exportToday').onclick=()=>exportXlsx('today');$('#exportEvent').onclick=()=>exportXlsx('event');$('#exportAll').onclick=()=>exportXlsx('all');$('#backupJson').onclick=backup;$('#restoreJson').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const x=JSON.parse(await f.text());if(!x.products||!x.sales)throw 0;localStorage.setItem(KEY,JSON.stringify(x));db=load();renderAll();toast('Backup restored')}catch{toast('Invalid backup file')}e.target.value=''};document.addEventListener('click',e=>{if(e.target.matches('[data-open-pos]'))switchView('pos');if(e.target.matches('[data-close-current]')&&currentEvent())closeEvent(currentEvent().id);if(e.target.matches('[data-delete-event]'))deletePastEvent(e.target.dataset.deleteEvent)});window.addEventListener('online',()=>{$('#offlineBadge').textContent='Online · offline ready';if(cloudSession){setCloudStatus('Cloud: syncing','syncing');syncCloudWorkspace().catch(console.error)}});window.addEventListener('offline',()=>{$('#offlineBadge').textContent='Offline';setCloudStatus('Cloud: offline','off');renderCloudPanel('Offline. Local POS remains available; product changes will sync later.')});$('#offlineBadge').textContent=navigator.onLine?'Online · offline ready':'Offline';if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));renderAll();initCloud().catch(e=>{console.error(e);setCloudStatus('Cloud: unavailable','warn');renderCloudPanel('Cloud initialization failed. Local POS is still available.')});
+renderCategoryOptions();resetProductCloudSnapshot();$('#cloudLoginForm').onsubmit=cloudLoginSubmit;$('#cloudOfflineBtn').onclick=()=>{if($('#cloudLoginDialog').open)$('#cloudLoginDialog').close();setCloudStatus('Cloud: offline mode','off');renderCloudPanel('Working from this device only until you sign in.')};$('#cloudAccountBtn').onclick=()=>cloudSession?switchView('export'):openCloudLogin();$('#cloudSyncAllBtn').onclick=syncAllToCloud;$('#cloudPullAllBtn').onclick=pullAllFromCloud;$('#cloudMigrateBtn').onclick=migrateLocalProductsToCloud;$('#cloudPullBtn').onclick=()=>pullCloudProducts();$('#cloudSyncBtn').onclick=()=>syncPendingProducts(true);$('#cloudImageSyncBtn').onclick=syncMissingProductImages;$('#cloudEventPushBtn').onclick=()=>syncEventsToCloud(true);$('#cloudEventPullBtn').onclick=()=>pullCloudEvents({showToast:true});$('#cloudSignOutBtn').onclick=cloudSignOut;$$('.tab').forEach(b=>b.onclick=()=>switchView(b.dataset.view));$('#search').oninput=renderProducts;$('#categoryFilter').onchange=()=>{renderPosCategoryButtons();renderProducts()};$('#clearCart').onclick=()=>{db.cart=[];save();renderCart()};$('#payCash').onclick=()=>checkout('Cash');$('#payPaynow').onclick=()=>checkout('PayNow');$('#addProductBtn').onclick=()=>openProduct();$('#productForm').onsubmit=saveProductForm;$('#productImage').onchange=handleProductImage;$('#removeProductImage').onclick=()=>{setImagePreview('');$('#productImage').value=''};$('#stockForm').onsubmit=saveStockForm;$('#createEventBtn').onclick=openCreateEvent;$('#eventForm').onsubmit=saveEventForm;const cancelEventCreate=$('#cancelEventCreate');if(cancelEventCreate)cancelEventCreate.onclick=()=>$('#eventDialog').close();$('#eventSetupSearch').oninput=e=>{eventDraft.search=e.target.value;renderEventDraft()};$('#eventSetupCategory').onchange=e=>{eventDraft.category=e.target.value;renderEventDraft()};$('#selectVisibleProducts').onclick=()=>setDraftVisible(true);$('#clearVisibleProducts').onclick=()=>setDraftVisible(false);$('#copyEventBtn').onclick=copyPreviousEvent;$('#eventCsvInput').onchange=e=>{importEventCsv(e.target.files[0],'create');e.target.value=''};$('#eventStockForm').onsubmit=saveEventStock;$('#manageSearch').oninput=e=>{manageDraft.search=e.target.value;renderManageDraft()};$('#manageCategory').onchange=e=>{manageDraft.category=e.target.value;renderManageDraft()};$('#manageCsvInput').onchange=e=>{importEventCsv(e.target.files[0],'manage');e.target.value=''};$('#saveManageEvent').onclick=saveManageEvent;$('#addPromoBtn').onclick=openPromo;$('#promoType').onchange=togglePromoFields;$('#promoForm').onsubmit=savePromoForm;$('#refreshSales').onclick=renderSales;$('#selectAllSales').onclick=()=>{selectedSaleIds=new Set(db.sales.map(s=>s.id));renderSales()};$('#clearSalesSelection').onclick=()=>{selectedSaleIds.clear();renderSales()};$('#deleteSelectedSales').onclick=bulkDeleteSelectedSales;$('#salesHeaderCheck').onchange=e=>{selectedSaleIds=e.target.checked?new Set(db.sales.map(s=>s.id)):new Set();renderSales()};$('#saleEditForm').onsubmit=saveSaleEditForm;$('#editAddProductBtn').onclick=addProductToEdit;$$('[data-close-dialog]').forEach(b=>b.onclick=()=>{const d=$('#'+b.dataset.closeDialog);if(d&&d.open)d.close()});$('#exportToday').onclick=()=>exportXlsx('today');$('#exportEvent').onclick=()=>exportXlsx('event');$('#exportAll').onclick=()=>exportXlsx('all');$('#backupJson').onclick=backup;$('#restoreJson').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const x=JSON.parse(await f.text());if(!x.products||!x.sales)throw 0;localStorage.setItem(KEY,JSON.stringify(x));db=load();renderAll();toast('Backup restored')}catch{toast('Invalid backup file')}e.target.value=''};document.addEventListener('click',e=>{if(e.target.matches('[data-open-pos]'))switchView('pos');if(e.target.matches('[data-close-current]')&&currentEvent())closeEvent(currentEvent().id);if(e.target.matches('[data-delete-event]'))deletePastEvent(e.target.dataset.deleteEvent)});window.addEventListener('online',()=>{$('#offlineBadge').textContent='Online · offline ready';if(cloudSession){setCloudStatus('Cloud: syncing','syncing');syncPendingSales(false).then(()=>syncCloudWorkspace()).catch(console.error)}});window.addEventListener('offline',()=>{$('#offlineBadge').textContent='Offline';setCloudStatus('Cloud: offline','off');renderCloudPanel('Offline. Local POS remains available; product changes will sync later.')});$('#offlineBadge').textContent=navigator.onLine?'Online · offline ready':'Offline';if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));renderAll();initCloud().catch(e=>{console.error(e);setCloudStatus('Cloud: unavailable','warn');renderCloudPanel('Cloud initialization failed. Local POS is still available.')});
 
 
 

@@ -202,3 +202,13 @@ V8.1 — CLOUD EVENTS + IMAGE DELIVERY
 - Product images are served from the Supabase `product-images` bucket.
 - IMPORTANT: run SUPABASE_V8_1_SETUP.sql once in Supabase SQL Editor before using V8.1.
 - V8.1 does NOT yet cloud-sync promotions or completed sales. Do not run the same live event from two iPads yet.
+
+
+V8.1.1 EVENT SYNC FIX
+---------------------
+- Fixed Supabase event upsert conflict targeting by replacing the partial events.local_id unique index with a normal unique index.
+- Added explicit "Sync Events to Cloud" and "Pull Events from Cloud" buttons in Export > Cloud Product Sync.
+- Added visible event push/pull error details.
+- Fresh devices pull events instead of first attempting to push an empty local event list.
+- Devices with existing events push first, then pull the canonical cloud copy.
+- Run SUPABASE_V8_1_1_EVENT_FIX.sql once before testing this build.

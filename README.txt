@@ -602,3 +602,35 @@ Void transactions remain visible in the filtered history but are excluded from R
 
 The selected range is remembered on the device.
 Select All now selects only transactions currently visible inside the chosen date range.
+
+
+V8.5.5 — EVENT PRODUCT VISIBILITY / STOCK COMMIT FIX
+----------------------------------------------------
+No new Supabase SQL is required.
+
+FIXED
+-----
+Manage Event Products & Stock previously relied on separate background queues after
+Save All Changes. A cloud refresh could briefly restore the older Event Inventory
+before the new product allocation had fully synced.
+
+V8.5.5 Save All Changes now:
+1. applies the event-product selection locally
+2. marks the event as pending/protected immediately
+3. renders the new product in POS immediately
+4. syncs affected Master Stock
+5. syncs the Event + Event Inventory
+6. only then pulls authoritative cloud state back
+
+POS VISIBILITY
+--------------
+An event product is shown when either:
+- activeProducts is true, OR
+- its Event Stock is greater than 0
+
+This adds protection against a temporarily stale active flag.
+
+CROSS-DEVICE
+------------
+event_inventory Realtime updates now perform a full Event pull as well, so adding
+a product to an event on iPad updates the PC POS, and vice versa.

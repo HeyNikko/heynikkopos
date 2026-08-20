@@ -29,7 +29,7 @@ function addToCart(id){const e=currentEvent();if(!e)return toast('Create or sele
 function changeQty(id,d){const r=db.cart.find(i=>i.id===id);if(!r||r.promo)return;const max=availableStock(r.productId);r.qty=Math.max(0,Math.min(max,r.qty+d));if(!r.qty)db.cart=db.cart.filter(x=>x.id!==id);recalcPromos()}
 function renderCategoryOptions(){const opts='<option value="">Select category…</option>'+CATEGORIES.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');$('#productCategory').innerHTML=opts;$('#categoryFilter').innerHTML='<option value="">All categories</option>'+CATEGORIES.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');$('#promoCategoryChecks').innerHTML=CATEGORIES.map(c=>`<label class="category-check"><input type="checkbox" value="${esc(c)}"> ${esc(c)}</label>`).join('');if(posCategoryState&&!CATEGORIES.includes(posCategoryState))posCategoryState='';$('#categoryFilter').value=posCategoryState;renderPosCategoryButtons()}
 function renderEventBanner(){const e=currentEvent();$('#eventBanner').innerHTML=e?`<div><strong>📍 ${esc(e.name)}</strong><span>${fmtDate(e.start)}${e.end&&e.end!==e.start?' – '+fmtDate(e.end):''}</span></div><button class="ghost" data-goto-events>Manage Event</button>`:`<div><strong>No active event selected</strong><span>Create an event and allocate stock before taking booth sales.</span></div><button class="primary" data-create-event>+ Create Event</button>`;const ce=$('[data-create-event]');if(ce)ce.onclick=openCreateEvent;const ge=$('[data-goto-events]');if(ge)ge.onclick=()=>switchView('events')}
-function renderProducts(){const q=($('#search')?.value||'').toLowerCase(),cat=posCategoryState||'',e=currentEvent();const cf=$('#categoryFilter');if(cf&&cf.value!==cat)cf.value=cat;const list=db.products.filter(p=>(!e||e.activeProducts?.[p.id])&&(!cat||p.category===cat)&&(p.name+' '+p.sku+' '+p.category).toLowerCase().includes(q));$('#productGrid').innerHTML=list.map(p=>{const stock=e?availableStock(p.id):0;return`<button class="product-card" data-add="${p.id}" ${!e||stock<=0?'disabled':''}>${productImageHtml(p,'product-card-image')}<div class="product-card-info"><strong>${esc(p.name)}</strong><div><span class="category-pill">${esc(p.category||'Uncategorised')}</span></div><div class="sku">${esc(p.sku)}</div><div class="price">${money(p.price)}</div><div class="${stock<=p.low?'stock-low':'muted'}">Event stock: ${stock}</div></div></button>`}).join('')||'<p class="muted">No products found.</p>';$$('[data-add]').forEach(b=>b.onclick=()=>addToCart(b.dataset.add))}
+function renderProducts(){const q=($('#search')?.value||'').toLowerCase(),cat=posCategoryState||'',e=currentEvent();const cf=$('#categoryFilter');if(cf&&cf.value!==cat)cf.value=cat;const list=db.products.filter(p=>(!e||e.activeProducts?.[p.id]||(Number(e.stock?.[p.id])||0)>0)&&(!cat||p.category===cat)&&(p.name+' '+p.sku+' '+p.category).toLowerCase().includes(q));$('#productGrid').innerHTML=list.map(p=>{const stock=e?availableStock(p.id):0;return`<button class="product-card" data-add="${p.id}" ${!e||stock<=0?'disabled':''}>${productImageHtml(p,'product-card-image')}<div class="product-card-info"><strong>${esc(p.name)}</strong><div><span class="category-pill">${esc(p.category||'Uncategorised')}</span></div><div class="sku">${esc(p.sku)}</div><div class="price">${money(p.price)}</div><div class="${stock<=p.low?'stock-low':'muted'}">Event stock: ${stock}</div></div></button>`}).join('')||'<p class="muted">No products found.</p>';$$('[data-add]').forEach(b=>b.onclick=()=>addToCart(b.dataset.add))}
 function renderCart(){$('#cart').innerHTML=db.cart.length?db.cart.map(r=>{const p=prod(r.productId);if(!p)return'';return`<div class="cart-row"><div class="cart-product">${productImageHtml(p,'cart-thumb')}<div><strong>${esc(p.name)}</strong> ${r.promo?'<span class="promo-pill">FREE PROMO</span>':''}<div class="muted">${esc(p.sku)} · ${r.promo?'$0.00':money(p.price)}</div></div></div><div class="qty">${r.promo?`× ${r.qty}`:`<button class="ghost" data-minus="${r.id}">−</button><strong>${r.qty}</strong><button class="ghost" data-plus="${r.id}">+</button>`}</div></div>`}).join(''):'<p class="muted">Tap a product to start an order.</p>';const pricing=calcBundlePricing(manualCart()),lines=pricing.applied.filter(a=>a.discount>0).map(a=>`<div class="bundle-line"><span>${esc(a.label)} × ${a.bundles}</span><strong>−${money(a.discount)}</strong></div>`).join('');$('#bundleDiscounts').innerHTML=lines;$('#subtotalRow').style.display=pricing.discount>0?'flex':'none';$('#subtotal').textContent=money(pricing.subtotal);$('#total').textContent=money(pricing.total);$$('[data-minus]').forEach(b=>b.onclick=()=>changeQty(b.dataset.minus,-1));$$('[data-plus]').forEach(b=>b.onclick=()=>changeQty(b.dataset.plus,1))
   // V7.2 checkout summary: keep subtotal, promotions, total and payment area visually grouped.
   const v70Summary = document.getElementById('cartSummary');
@@ -211,7 +211,109 @@ function manageRemoveAllVisible(){
 window.manageAddAllVisible=manageAddAllVisible;
 window.manageRemoveAllVisible=manageRemoveAllVisible;
 
-function saveManageEvent(){const e=eventById(manageDraft.eventId);if(!e)return;for(const p of db.products){const was=!!e.activeProducts?.[p.id],want=!!manageDraft.active[p.id],cur=e.stock[p.id]||0,target=want?Math.max(0,+manageDraft.target[p.id]||0):0;if(want&&target>cur&&target-cur>p.stock)return toast(`${p.name}: need ${target-cur}, only ${p.stock} in Master Stock`)}for(const p of db.products){const was=!!e.activeProducts?.[p.id],want=!!manageDraft.active[p.id],cur=e.stock[p.id]||0,target=want?Math.max(0,+manageDraft.target[p.id]||0):0;if(!want&&was){if(cur){p.stock+=cur;e.returned[p.id]=(e.returned[p.id]||0)+cur;db.movements.push({id:uid('m'),createdAt:nowISO(),productId:p.id,sku:p.sku,name:p.name,delta:cur,scope:'master',eventId:e.id,eventName:e.name,reason:'Removed from event / stock returned',receipt:''});db.movements.push({id:uid('m'),createdAt:nowISO(),productId:p.id,sku:p.sku,name:p.name,delta:-cur,scope:'event',eventId:e.id,eventName:e.name,reason:'Removed from selling',receipt:''})}e.stock[p.id]=0;e.activeProducts[p.id]=false;continue}if(want){e.activeProducts[p.id]=true;if(!was&&e.opening[p.id]===undefined)e.opening[p.id]=0;const diff=target-cur;if(diff>0){p.stock-=diff;e.stock[p.id]=target;e.added[p.id]=(e.added[p.id]||0)+diff;db.movements.push({id:uid('m'),createdAt:nowISO(),productId:p.id,sku:p.sku,name:p.name,delta:-diff,scope:'master',eventId:e.id,eventName:e.name,reason:was?'Bulk event stock increase':'Added product to event',receipt:''});db.movements.push({id:uid('m'),createdAt:nowISO(),productId:p.id,sku:p.sku,name:p.name,delta:diff,scope:'event',eventId:e.id,eventName:e.name,reason:was?'Bulk event stock increase':'Product added to event',receipt:''})}else if(diff<0){const ret=-diff;p.stock+=ret;e.stock[p.id]=target;e.returned[p.id]=(e.returned[p.id]||0)+ret;db.movements.push({id:uid('m'),createdAt:nowISO(),productId:p.id,sku:p.sku,name:p.name,delta:ret,scope:'master',eventId:e.id,eventName:e.name,reason:'Bulk event stock returned',receipt:''});db.movements.push({id:uid('m'),createdAt:nowISO(),productId:p.id,sku:p.sku,name:p.name,delta:-ret,scope:'event',eventId:e.id,eventName:e.name,reason:'Bulk event stock reduction',receipt:''})}}}save();$('#manageEventDialog').close();renderAll();toast('Event products & stock updated')}
+async function saveManageEvent(){
+  const e=eventById(manageDraft.eventId);
+  if(!e)return;
+
+  const changedProductIds=new Set();
+
+  for(const p of db.products){
+    const was=!!e.activeProducts?.[p.id],
+      want=!!manageDraft.active[p.id],
+      cur=Number(e.stock[p.id]||0),
+      target=want?Math.max(0,+manageDraft.target[p.id]||0):0;
+
+    if(want&&target>cur&&target-cur>p.stock){
+      return toast(`${p.name}: need ${target-cur}, only ${p.stock} in Master Stock`);
+    }
+  }
+
+  for(const p of db.products){
+    const was=!!e.activeProducts?.[p.id],
+      want=!!manageDraft.active[p.id],
+      cur=Number(e.stock[p.id]||0),
+      target=want?Math.max(0,+manageDraft.target[p.id]||0):0;
+
+    if(!want&&was){
+      if(cur){
+        p.stock+=cur;
+        changedProductIds.add(p.id);
+        e.returned[p.id]=(e.returned[p.id]||0)+cur;
+        db.movements.push({id:uid('m'),createdAt:nowISO(),productId:p.id,sku:p.sku,name:p.name,delta:cur,scope:'master',eventId:e.id,eventName:e.name,reason:'Removed from event / stock returned',receipt:''});
+        db.movements.push({id:uid('m'),createdAt:nowISO(),productId:p.id,sku:p.sku,name:p.name,delta:-cur,scope:'event',eventId:e.id,eventName:e.name,reason:'Removed from selling',receipt:''});
+      }
+      e.stock[p.id]=0;
+      e.activeProducts[p.id]=false;
+      continue;
+    }
+
+    if(want){
+      // Make visibility immediate before any cloud work begins.
+      e.activeProducts[p.id]=true;
+      if(!was&&e.opening[p.id]===undefined)e.opening[p.id]=0;
+
+      const diff=target-cur;
+      if(diff>0){
+        p.stock-=diff;
+        changedProductIds.add(p.id);
+        e.stock[p.id]=target;
+        e.added[p.id]=(e.added[p.id]||0)+diff;
+        db.movements.push({id:uid('m'),createdAt:nowISO(),productId:p.id,sku:p.sku,name:p.name,delta:-diff,scope:'master',eventId:e.id,eventName:e.name,reason:was?'Bulk event stock increase':'Added product to event',receipt:''});
+        db.movements.push({id:uid('m'),createdAt:nowISO(),productId:p.id,sku:p.sku,name:p.name,delta:diff,scope:'event',eventId:e.id,eventName:e.name,reason:was?'Bulk event stock increase':'Product added to event',receipt:''});
+      }else if(diff<0){
+        const ret=-diff;
+        p.stock+=ret;
+        changedProductIds.add(p.id);
+        e.stock[p.id]=target;
+        e.returned[p.id]=(e.returned[p.id]||0)+ret;
+        db.movements.push({id:uid('m'),createdAt:nowISO(),productId:p.id,sku:p.sku,name:p.name,delta:ret,scope:'master',eventId:e.id,eventName:e.name,reason:'Bulk event stock returned',receipt:''});
+        db.movements.push({id:uid('m'),createdAt:nowISO(),productId:p.id,sku:p.sku,name:p.name,delta:-ret,scope:'event',eventId:e.id,eventName:e.name,reason:'Bulk event stock reduction',receipt:''});
+      }else{
+        // Ensure stock key exists for newly-enabled zero-stock products.
+        if(e.stock[p.id]===undefined)e.stock[p.id]=target;
+      }
+    }
+  }
+
+  // Explicitly mark the event dirty before save/render so background cloud pulls
+  // cannot overwrite this just-edited allocation.
+  markEventPending(e.id);
+  save();
+
+  $('#manageEventDialog').close();
+  renderAll();
+  toast('Event products & stock updated · syncing…');
+
+  if(cloudSession&&sb&&navigator.onLine){
+    try{
+      // Master quantities changed during allocation/return. Push them first.
+      if(changedProductIds.size){
+        const pendingProducts=getPendingProductIds();
+        for(const id of changedProductIds)pendingProducts.add(id);
+        setPendingProductIds(pendingProducts);
+        const productsOK=await syncPendingProducts(false);
+        if(!productsOK)throw new Error('Master Stock sync did not complete');
+      }
+
+      // Then commit the event + full event_inventory rows.
+      const eventOK=await syncPendingEvents(false);
+      if(!eventOK)throw new Error('Event inventory sync did not complete');
+
+      // Pull back authoritative state only after both writes are complete.
+      await pullCloudEvents({showToast:false});
+      await refreshCurrentEventInventoryFromCloud();
+      renderAll();
+      toast('Event products & stock synced');
+    }catch(err){
+      console.error('Manage Event sync failed',err);
+      setCloudStatus('Cloud: event stock pending','warn');
+      renderCloudPanel(`Event stock changes are saved locally and protected, but cloud sync is still pending: ${formatCloudError(err)}`);
+      toast('Saved locally · event stock cloud sync pending');
+    }
+  }else{
+    toast('Saved locally · event stock will sync when online');
+  }
+}
 function openEventStock(eventId,productId){const e=eventById(eventId),p=prod(productId);if(!e||e.status!=='open'||!p)return;$('#eventStockEventId').value=e.id;$('#eventStockProductId').value=p.id;$('#eventStockProductName').textContent=`${p.name} · Event left ${e.stock[p.id]||0} · Master available ${p.stock}`;$('#eventStockQty').value='';$('#eventStockSource').value='master';$('#eventStockDialog').showModal()}
 function saveEventStock(e){e.preventDefault();const ev=eventById($('#eventStockEventId').value),p=prod($('#eventStockProductId').value),q=+$('#eventStockQty').value,source=$('#eventStockSource').value;if(!ev||!p||q<=0)return toast('Enter a quantity');if(source==='master'&&q>p.stock)return toast(`Only ${p.stock} available in Master Stock`);ev.activeProducts[p.id]=true;if(source==='master'){p.stock-=q;db.movements.push({id:uid('m'),createdAt:nowISO(),productId:p.id,sku:p.sku,name:p.name,delta:-q,scope:'master',eventId:ev.id,eventName:ev.name,reason:'Transferred to event',receipt:''})}else{db.movements.push({id:uid('m'),createdAt:nowISO(),productId:p.id,sku:p.sku,name:p.name,delta:q,scope:'company',eventId:ev.id,eventName:ev.name,reason:'New stock received directly at event',receipt:''})}ev.stock[p.id]=(ev.stock[p.id]||0)+q;ev.added[p.id]=(ev.added[p.id]||0)+q;db.movements.push({id:uid('m'),createdAt:nowISO(),productId:p.id,sku:p.sku,name:p.name,delta:q,scope:'event',eventId:ev.id,eventName:ev.name,reason:source==='master'?'Mid-event transfer':'New stock received at event',receipt:''});save();$('#eventStockDialog').close();renderAll();toast('Event stock added')}
 async function closeEvent(id){
@@ -677,6 +779,10 @@ function scheduleCloudSaleSync(){
 async function refreshCurrentEventInventoryFromCloud(){
   const ev=currentEvent();
   if(!ev||!ev.cloudId||!cloudSession||!sb||!navigator.onLine)return false;
+  if(getPendingEventIds().has(ev.id)){
+    renderProducts();renderEventBanner();renderEvents();
+    return true;
+  }
   const {data,error}=await sb.from('event_inventory')
     .select('product_id,current_qty,active')
     .eq('event_id',ev.cloudId);
@@ -1528,6 +1634,8 @@ function scheduleRealtimeInventoryRefresh(reason='stock'){
   cloudRealtimeInventoryTimer=setTimeout(async()=>{
     if(!cloudSession||!sb||!navigator.onLine)return;
     try{
+      await syncPendingEvents(false);
+      await pullCloudEvents({showToast:false});
       await refreshCurrentEventInventoryFromCloud();
       renderProducts();
       renderCart();

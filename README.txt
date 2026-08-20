@@ -634,3 +634,22 @@ CROSS-DEVICE
 ------------
 event_inventory Realtime updates now perform a full Event pull as well, so adding
 a product to an event on iPad updates the PC POS, and vice versa.
+
+
+V8.5.6 — iPAD ADD EVENT STOCK DIALOG FIX
+----------------------------------------
+No Supabase SQL changes are required.
+
+FIXED
+-----
+On iPad Safari, the Cancel button inside Add Event Stock was behaving like a form
+submit button. Because Quantity is required, Safari blocked the action and showed
+"Please fill out this field" instead of closing the dialog.
+
+V8.5.6:
+- Cancel is explicitly type="button"
+- Add Stock is explicitly type="submit"
+- Cancel always closes without validating Quantity
+- tapping the dark backdrop closes the dialog
+- Escape / native dialog cancel still closes on desktop
+- added pointer handling for iPad Safari backdrop taps

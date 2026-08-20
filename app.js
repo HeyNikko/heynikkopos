@@ -7,6 +7,7 @@ const CLOUD_SALES_ERRORS_KEY='heynikko_pos_v8_sales_errors';
 const CLOUD_PENDING_VOIDS_KEY='heynikko_pos_v8_pending_voids';
 const CLOUD_PENDING_DELETES_KEY='heynikko_pos_v8_pending_deletes';
 const CLOUD_PENDING_EVENT_DELETES_KEY='heynikko_pos_v8_pending_event_deletes';
+const CLOUD_PENDING_EVENTS_KEY='heynikko_pos_v8_pending_events';
 
 const CATEGORIES=['Stickers','Sticker Sheets','Keychain','Postcard','Lifestyle'];
 const DEFAULT_BUNDLES=[
@@ -15,9 +16,9 @@ const DEFAULT_BUNDLES=[
  {id:'bp-keychain',type:'bundle',categories:['Keychain'],qty:3,bundlePrice:15,active:true}
 ];
 const seed={products:[{id:'p1',sku:'BB-ST01',name:'Baobao Sticker',category:'Stickers',price:2.5,stock:100,low:5,image:''},{id:'p2',sku:'SN-ST01',name:'Sunny Sticker',category:'Stickers',price:2.5,stock:80,low:5,image:''}],promos:[],bundlePromos:DEFAULT_BUNDLES,sales:[],movements:[],cart:[],events:[],currentEventId:''};
-let db=load(),pendingProductImage='',editSaleDraft=[],selectedSaleIds=new Set(),sb=null,cloudSession=null,cloudSyncTimer=null,cloudProductSnapshot=new Map(),cloudEventSyncTimer=null,cloudSaleSyncTimer=null,cloudWorkspacePoller=null,cloudRealtimeChannel=null,cloudRealtimeTimer=null,cloudRealtimeInventoryTimer=null,cloudRealtimeProductTimer=null,cloudFocusRefreshBusy=false,posCategoryState=localStorage.getItem('heynikko_pos_category')||'',cloudProductPushInFlight=false;
+let db=load(),pendingProductImage='',editSaleDraft=[],selectedSaleIds=new Set(),sb=null,cloudSession=null,cloudSyncTimer=null,cloudProductSnapshot=new Map(),cloudEventSyncTimer=null,cloudSaleSyncTimer=null,cloudWorkspacePoller=null,cloudRealtimeChannel=null,cloudRealtimeTimer=null,cloudRealtimeInventoryTimer=null,cloudRealtimeProductTimer=null,cloudFocusRefreshBusy=false,posCategoryState=localStorage.getItem('heynikko_pos_category')||'',cloudProductPushInFlight=false,cloudEventSnapshot=new Map(),cloudRealtimeEventTimer=null;
 function load(){try{const raw=JSON.parse(localStorage.getItem(KEY)||'{}'),d={...structuredClone(seed),...raw};d.products=(d.products||[]).map(p=>({...p,image:p.image||'',category:p.category||'',stock:+p.stock||0}));d.promos=(d.promos||[]).map(p=>({...p,type:'gift'}));d.bundlePromos=Array.isArray(raw.bundlePromos)?raw.bundlePromos:structuredClone(DEFAULT_BUNDLES);d.sales=(d.sales||[]).map(s=>({...s,status:s.status||'active',subtotal:s.subtotal??s.total,bundleDiscount:s.bundleDiscount||0,bundlePromos:s.bundlePromos||[],eventId:s.eventId||'',eventName:s.eventName||''}));d.movements=d.movements||[];d.cart=d.cart||[];d.events=(d.events||[]).map(e=>{const x={...e,status:e.status||'open',stock:e.stock||{},opening:e.opening||{},added:e.added||{},returned:e.returned||{},activeProducts:e.activeProducts||{},createdAt:e.createdAt||new Date().toISOString()};if(!Object.keys(x.activeProducts).length){for(const id of new Set([...Object.keys(x.stock),...Object.keys(x.opening),...Object.keys(x.added)]))x.activeProducts[id]=true}return x});d.currentEventId=d.currentEventId||'';return d}catch{return structuredClone(seed)}}
-function persistLocal(){try{localStorage.setItem(KEY,JSON.stringify(db))}catch(e){toast('Storage is full. Export a backup and use smaller images.');throw e}}function save(){persistLocal();try{captureChangedProducts()}catch(e){console.warn('Cloud product change capture skipped',e)}try{scheduleCloudEventSync()}catch(e){console.warn('Cloud event sync schedule skipped',e)}try{scheduleCloudSaleSync()}catch(e){console.warn('Cloud sale sync schedule skipped',e)}}
+function persistLocal(){try{localStorage.setItem(KEY,JSON.stringify(db))}catch(e){toast('Storage is full. Export a backup and use smaller images.');throw e}}function save(){persistLocal();try{captureChangedProducts()}catch(e){console.warn('Cloud product change capture skipped',e)}try{captureChangedEvents();scheduleCloudEventSync()}catch(e){console.warn('Cloud event change capture skipped',e)}try{scheduleCloudSaleSync()}catch(e){console.warn('Cloud sale sync schedule skipped',e)}}
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];const money=n=>new Intl.NumberFormat('en-SG',{style:'currency',currency:'SGD'}).format(Number(n)||0);const nowISO=()=>new Date().toISOString();const uid=p=>p+Date.now().toString(36)+Math.random().toString(36).slice(2,7);function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200)}function prod(id){return db.products.find(p=>p.id===id)}function eventById(id){return db.events.find(e=>e.id===id)}function currentEvent(){const e=eventById(db.currentEventId);return e&&e.status==='open'?e:null}function activeSale(s){return(s.status||'active')!=='voided'}function manualCart(){return db.cart.filter(i=>!i.promo)}
 function productImageHtml(p,cls='product-thumb'){return p?.image?`<img class="${cls}" src="${p.image}" alt="${esc(p.name)}">`:`<div class="${cls} image-placeholder">☀️</div>`}
 function availableStock(id,eventId=db.currentEventId){const e=eventById(eventId);return e&&e.status==='open'?+(e.stock[id]||0):+(prod(id)?.stock||0)}
@@ -222,6 +223,9 @@ async function closeEvent(id){
     if(!deletesOK||!voidsOK||!salesOK)throw new Error('Pending sale/void/delete changes must sync before the event can close');
     await upsertEventToCloud(e);
     const {data,error}=await sb.rpc('close_pos_event',{p_event_id:e.cloudId,p_local_id:e.id,p_closed_at:nowISO()});
+    const pendingEvents=getPendingEventIds();
+    pendingEvents.delete(e.id);
+    setPendingEventIds(pendingEvents);
     if(error)throw error;
     await pullCloudProducts({auto:true,silent:true});
     await pullCloudEvents({showToast:false});
@@ -349,6 +353,9 @@ async function deletePastEvent(id){
     s.deletedWithEvent=true;
   }
 
+  const pendingEvents=getPendingEventIds();
+  pendingEvents.delete(e.id);
+  setPendingEventIds(pendingEvents);
   queueEventDeleteForCloud(e.id);
   persistLocal();
   renderAll();
@@ -401,7 +408,7 @@ function setPendingProductIds(set){localStorage.setItem(CLOUD_PENDING_KEY,JSON.s
 function captureChangedProducts(){if(!cloudProductSnapshot.size){resetProductCloudSnapshot();return}const pending=getPendingProductIds();for(const p of db.products){const fp=cloudFingerprint(p),old=cloudProductSnapshot.get(p.id);if(old!==undefined&&old!==fp)pending.add(p.id);if(old===undefined)pending.add(p.id)}setPendingProductIds(pending);renderCloudPanel();scheduleCloudProductSync()}
 function scheduleCloudProductSync(){if(cloudSyncTimer)clearTimeout(cloudSyncTimer);if(!navigator.onLine||!cloudSession||!sb)return;cloudSyncTimer=setTimeout(()=>syncPendingProducts(false),1000)}
 function setCloudStatus(text,state='off'){const b=$('#cloudBadge');if(b){b.textContent=text;b.className=`cloud-badge cloud-${state}`}const p=$('#cloudPanelStatus');if(p){p.textContent=text.replace('Cloud: ','');p.className=`status-pill cloud-panel-${state}`}}
-function renderCloudPanel(extra=''){const stats=$('#cloudSyncStats');if(stats){const pending=getPendingProductIds().size;stats.innerHTML=`<span>Local products: <strong>${db.products.length}</strong></span><span>Cloud products: <strong id="cloudCountValue">${window.__cloudProductCount??'—'}</strong></span><span>Pending products: <strong>${pending}</strong></span><span>Pending sales: <strong>${getPendingSaleIds().size}</strong></span><span>Pending voids: <strong>${getPendingVoidIds().size}</strong></span><span>Pending deletes: <strong>${getPendingDeleteIds().size}</strong></span><span>Pending event deletes: <strong>${getPendingEventDeleteIds().size}</strong></span>`}const pr=$('#cloudProgress');if(pr&&extra)pr.textContent=extra;const account=$('#cloudAccountBtn');if(account)account.textContent=cloudSession?.user?.email||'Sign in'}
+function renderCloudPanel(extra=''){const stats=$('#cloudSyncStats');if(stats){const pending=getPendingProductIds().size;stats.innerHTML=`<span>Local products: <strong>${db.products.length}</strong></span><span>Cloud products: <strong id="cloudCountValue">${window.__cloudProductCount??'—'}</strong></span><span>Pending products: <strong>${pending}</strong></span><span>Pending sales: <strong>${getPendingSaleIds().size}</strong></span><span>Pending voids: <strong>${getPendingVoidIds().size}</strong></span><span>Pending deletes: <strong>${getPendingDeleteIds().size}</strong></span><span>Pending events: <strong>${getPendingEventIds().size}</strong></span><span>Pending event deletes: <strong>${getPendingEventDeleteIds().size}</strong></span>`}const pr=$('#cloudProgress');if(pr&&extra)pr.textContent=extra;const account=$('#cloudAccountBtn');if(account)account.textContent=cloudSession?.user?.email||'Sign in'}
 async function refreshCloudProductCount(){if(!sb||!cloudSession)return;const {count,error}=await sb.from('products').select('*',{count:'exact',head:true});if(!error){window.__cloudProductCount=count||0;renderCloudPanel()}}
 function safeFileName(s){return String(s||'product').replace(/[^a-z0-9_-]+/gi,'-').replace(/^-+|-+$/g,'').toLowerCase()||'product'}
 async function uploadCloudProductImage(p){const src=p.image||'';if(!src||!src.startsWith('data:'))return src||null;const res=await fetch(src);const blob=await res.blob();const ext=blob.type.includes('png')?'png':'jpg';const path=`products/${safeFileName(p.sku)}-${Date.now()}.${ext}`;const {error}=await sb.storage.from('product-images').upload(path,blob,{contentType:blob.type||'image/jpeg',upsert:true});if(error)throw error;const {data}=sb.storage.from('product-images').getPublicUrl(path);return data?.publicUrl||null}
@@ -504,6 +511,29 @@ async function syncMissingProductImages(){
 
 
 
+function getPendingEventIds(){try{return new Set(JSON.parse(localStorage.getItem(CLOUD_PENDING_EVENTS_KEY)||'[]'))}catch{return new Set()}}
+function setPendingEventIds(set){localStorage.setItem(CLOUD_PENDING_EVENTS_KEY,JSON.stringify([...set]));renderCloudPanel()}
+function eventFingerprint(e){
+  return JSON.stringify({
+    name:e.name||'',start:e.start||'',end:e.end||'',status:e.status||'open',closedAt:e.closedAt||'',
+    stock:e.stock||{},opening:e.opening||{},added:e.added||{},returned:e.returned||{},activeProducts:e.activeProducts||{}
+  });
+}
+function resetEventCloudSnapshot(){
+  cloudEventSnapshot=new Map(db.events.filter(e=>!e.deletedPending).map(e=>[e.id,eventFingerprint(e)]));
+}
+function captureChangedEvents(){
+  const pending=getPendingEventIds();
+  for(const e of db.events){
+    if(e.deletedPending)continue;
+    const fp=eventFingerprint(e);
+    if(cloudEventSnapshot.get(e.id)!==fp)pending.add(e.id);
+  }
+  setPendingEventIds(pending);
+}
+function markEventPending(id){
+  const pending=getPendingEventIds();pending.add(id);setPendingEventIds(pending);
+}
 function getPendingEventDeleteIds(){try{return new Set(JSON.parse(localStorage.getItem(CLOUD_PENDING_EVENT_DELETES_KEY)||'[]'))}catch{return new Set()}}
 function setPendingEventDeleteIds(set){localStorage.setItem(CLOUD_PENDING_EVENT_DELETES_KEY,JSON.stringify([...set]));renderCloudPanel()}
 function queueEventDeleteForCloud(id){const q=getPendingEventDeleteIds();q.add(id);setPendingEventDeleteIds(q)}
@@ -791,7 +821,8 @@ async function pullCloudSales(options={}){
 function scheduleCloudEventSync(){
   clearTimeout(cloudEventSyncTimer);
   if(!cloudSession||!sb||!navigator.onLine)return;
-  cloudEventSyncTimer=setTimeout(()=>syncEventsToCloud(false),700);
+  if(!getPendingEventIds().size)return;
+  cloudEventSyncTimer=setTimeout(()=>syncPendingEvents(false),500);
 }
 function localProductCloudId(localId){
   const p=prod(localId);
@@ -840,6 +871,47 @@ async function upsertEventToCloud(ev){
   }
   return eventRow;
 }
+async function syncPendingEvents(showToast=true){
+  if(!cloudSession||!sb){if(showToast)openCloudLogin();return false}
+  if(!navigator.onLine){if(showToast)toast('Offline — event changes will sync later');return false}
+
+  const pending=getPendingEventIds();
+  if(!pending.size)return true;
+
+  setCloudStatus('Cloud: syncing event','syncing');
+  let done=0,failed=[];
+
+  for(const id of [...pending]){
+    const ev=db.events.find(e=>e.id===id);
+    if(!ev||ev.deletedPending){pending.delete(id);continue}
+
+    try{
+      await upsertEventToCloud(ev);
+      cloudEventSnapshot.set(ev.id,eventFingerprint(ev));
+      pending.delete(id);
+      done++;
+      setPendingEventIds(pending);
+    }catch(err){
+      console.error('Event push failed',err);
+      failed.push(`${ev.name}: ${formatCloudError(err)}`);
+    }
+  }
+
+  setPendingEventIds(pending);
+  persistLocal();
+
+  if(failed.length){
+    setCloudStatus('Cloud: event sync issue','warn');
+    renderCloudPanel(`Event changes pending: ${failed.slice(0,3).join(' · ')}`);
+    if(showToast)toast('Some event changes are still pending');
+    return false;
+  }
+
+  setCloudStatus('Cloud: synced','on');
+  if(showToast)toast(`${done} event change${done===1?'':'s'} synced`);
+  return true;
+}
+
 async function syncEventsToCloud(showToast=true){
   if(!cloudSession||!sb){if(showToast)openCloudLogin();return false}
   if(!navigator.onLine){if(showToast)toast('Offline — event changes will sync later');return false}
@@ -942,6 +1014,7 @@ async function pullCloudEvents(options={}){
     if(!events?.length)return;
 
     const pendingLocalDeletes=getPendingEventDeleteIds();
+    const pendingEventChanges=getPendingEventIds();
     const pendingCloudDeletes=pendingDeletedEventCloudIds();
     const existingByLocal=new Map(db.events.map(e=>[String(e.id),e]));
     const existingByCloud=new Map(db.events.filter(e=>e.cloudId).map(e=>[String(e.cloudId),e]));
@@ -950,6 +1023,11 @@ async function pullCloudEvents(options={}){
       if(pendingLocalDeletes.has(r.local_id)||pendingCloudDeletes.has(String(r.id)))continue;
       const localId=r.local_id||`cloud_event_${r.id}`;
       const old=existingByLocal.get(String(localId))||existingByCloud.get(String(r.id));
+      if(old&&pendingEventChanges.has(old.id)){
+        old.cloudId=r.id||old.cloudId;
+        rebuilt.push(old);
+        continue;
+      }
       const ev={
         ...(old||{}),
         id:old?.id||localId,
@@ -975,6 +1053,12 @@ async function pullCloudEvents(options={}){
     }
     const tombstones=db.events.filter(e=>e.deletedPending&&pendingLocalDeletes.has(e.id));
     db.events=[...tombstones,...rebuilt];
+    for(const ev of db.events){
+      if(!pendingEventChanges.has(ev.id)&&!ev.deletedPending)cloudEventSnapshot.set(ev.id,eventFingerprint(ev));
+    }
+    for(const id of [...cloudEventSnapshot.keys()]){
+      if(!db.events.some(e=>e.id===id)&&!pendingEventChanges.has(id))cloudEventSnapshot.delete(id);
+    }
     const open=db.events.filter(e=>e.status==='open');
     if(!eventById(db.currentEventId)||eventById(db.currentEventId)?.status!=='open'){
       db.currentEventId=open.length?open[open.length-1].id:'';
@@ -1178,15 +1262,15 @@ async function syncCloudWorkspace(){
   await refreshCloudProductCount();
   await syncPendingProducts(false);
   await maybeAutoPullCloudProducts();
-  if(db.events.length){
-    const pushed=await syncEventsToCloud(false);
-    if(pushed)await pullCloudEvents({showToast:false});
-  }else{
-    await pullCloudEvents({showToast:false});
-  }
+
+  // Important: only deliberate local event changes are pushed.
+  // Never upload every local event here because another device may have newer open/closed state.
+  await syncPendingEventDeletes(false);
+  await syncPendingEvents(false);
+  await pullCloudEvents({showToast:false});
+
   try{await syncPromotionsToCloud();await pullCloudPromotions()}catch(e){console.warn('Promotion cloud sync skipped',e)}
   await syncPendingDeletes(false);
-    await syncPendingEventDeletes(false);
   await syncPendingVoids(false);
   await syncPendingSales(false);
   await pullCloudSales({showToast:false});
@@ -1219,9 +1303,11 @@ function stopCloudRealtime(){
   clearTimeout(cloudRealtimeTimer);
   clearTimeout(cloudRealtimeInventoryTimer);
   clearTimeout(cloudRealtimeProductTimer);
+  clearTimeout(cloudRealtimeEventTimer);
   cloudRealtimeTimer=null;
   cloudRealtimeInventoryTimer=null;
   cloudRealtimeProductTimer=null;
+  cloudRealtimeEventTimer=null;
   if(cloudRealtimeChannel&&sb){
     try{sb.removeChannel(cloudRealtimeChannel)}catch(e){console.warn('Realtime channel cleanup skipped',e)}
   }
@@ -1280,6 +1366,28 @@ function scheduleRealtimeInventoryRefresh(reason='stock'){
   },300);
 }
 
+function scheduleRealtimeEventRefresh(reason='event'){
+  clearTimeout(cloudRealtimeEventTimer);
+  cloudRealtimeEventTimer=setTimeout(async()=>{
+    if(!cloudSession||!sb||!navigator.onLine)return;
+    try{
+      // Push only deliberate local changes first, then receive authoritative cloud state.
+      await syncPendingEventDeletes(false);
+      await syncPendingEvents(false);
+      const ok=await pullCloudEvents({showToast:false});
+      if(!ok)return;
+      await refreshCurrentEventInventoryFromCloud();
+      renderAll();
+      setCloudStatus('Cloud: live','on');
+      renderCloudPanel(`Live event update received: ${reason}.`);
+    }catch(err){
+      console.warn('Realtime event refresh skipped',err);
+      setCloudStatus('Cloud: event refresh issue','warn');
+      renderCloudPanel(`Event refresh failed: ${formatCloudError(err)}`);
+    }
+  },350);
+}
+
 function startCloudRealtime(){
   if(!sb||!cloudSession||!navigator.onLine)return;
   stopCloudRealtime();
@@ -1293,6 +1401,9 @@ function startCloudRealtime(){
     })
     .on('postgres_changes',{event:'*',schema:'public',table:'event_inventory'},payload=>{
       scheduleRealtimeInventoryRefresh(`event stock ${String(payload.eventType||'change').toLowerCase()}`);
+    })
+    .on('postgres_changes',{event:'*',schema:'public',table:'events'},payload=>{
+      scheduleRealtimeEventRefresh(`events ${String(payload.eventType||'change').toLowerCase()}`);
     })
     .on('postgres_changes',{event:'*',schema:'public',table:'products'},payload=>{
       scheduleRealtimeProductRefresh(`products ${String(payload.eventType||'change').toLowerCase()}`);
@@ -1316,11 +1427,13 @@ async function refreshCloudAfterFocus(){
   try{
     await syncPendingDeletes(false);
     await syncPendingEventDeletes(false);
+    await syncPendingEvents(false);
     await syncPendingVoids(false);
     await syncPendingSales(false);
     await syncPendingProducts(false);
     await pullCloudSales({showToast:false});
     await pullCloudProducts({auto:true,silent:true});
+    await pullCloudEvents({showToast:false});
     await refreshCurrentEventInventoryFromCloud();
     renderAll();
     if(!cloudRealtimeChannel)startCloudRealtime();
@@ -1338,11 +1451,13 @@ function startCloudWorkspacePoller(){
     try{
       await syncPendingDeletes(false);
     await syncPendingEventDeletes(false);
+    await syncPendingEvents(false);
       await syncPendingVoids(false);
       await syncPendingSales(false);
       await syncPendingProducts(false);
       await pullCloudProducts({auto:true,silent:true});
-      await refreshCurrentEventInventoryFromCloud();
+      await pullCloudEvents({showToast:false});
+    await refreshCurrentEventInventoryFromCloud();
       await pullCloudSales({showToast:false});
     }catch(e){console.warn('Background cloud refresh skipped',e)}
   },15000);
@@ -1397,7 +1512,7 @@ async function retryCloudLibrary(){
   }
 }
 
-async function initCloud(){resetProductCloudSnapshot();renderCloudPanel();if(!window.supabase){const ok=await ensureSupabaseLibrary();if(!ok){setCloudStatus('Cloud: unavailable','warn');renderCloudPanel(`Cloud library unavailable. ${window.__supabaseLoadError||'Loading failed.'} Local POS still works offline.`);const b=$('#cloudRetryLibraryBtn');if(b)b.style.display='block';return}}sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}});const {data}=await sb.auth.getSession();cloudSession=data?.session||null;sb.auth.onAuthStateChange((event,session)=>{cloudSession=session||null;if(cloudSession){setCloudStatus('Cloud: synced','on');renderCloudPanel();scheduleCloudProductSync();startCloudWorkspacePoller();startCloudRealtime()}else{clearInterval(cloudWorkspacePoller);stopCloudRealtime();setCloudStatus('Cloud: signed out','off');renderCloudPanel()}});if(cloudSession){setCloudStatus('Cloud: synced','on');renderCloudPanel();await syncCloudWorkspace();startCloudWorkspacePoller();startCloudRealtime()}else{setCloudStatus('Cloud: signed out','off');renderCloudPanel();if(navigator.onLine)setTimeout(openCloudLogin,350)}}
+async function initCloud(){resetEventCloudSnapshot();resetProductCloudSnapshot();renderCloudPanel();if(!window.supabase){const ok=await ensureSupabaseLibrary();if(!ok){setCloudStatus('Cloud: unavailable','warn');renderCloudPanel(`Cloud library unavailable. ${window.__supabaseLoadError||'Loading failed.'} Local POS still works offline.`);const b=$('#cloudRetryLibraryBtn');if(b)b.style.display='block';return}}sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}});const {data}=await sb.auth.getSession();cloudSession=data?.session||null;sb.auth.onAuthStateChange((event,session)=>{cloudSession=session||null;if(cloudSession){setCloudStatus('Cloud: synced','on');renderCloudPanel();scheduleCloudProductSync();startCloudWorkspacePoller();startCloudRealtime()}else{clearInterval(cloudWorkspacePoller);stopCloudRealtime();setCloudStatus('Cloud: signed out','off');renderCloudPanel()}});if(cloudSession){setCloudStatus('Cloud: synced','on');renderCloudPanel();await syncCloudWorkspace();startCloudWorkspacePoller();startCloudRealtime()}else{setCloudStatus('Cloud: signed out','off');renderCloudPanel();if(navigator.onLine)setTimeout(openCloudLogin,350)}}
 
 function renderAll(){
   const renderers=[renderEventBanner,renderProducts,renderCart,renderProductTable,renderEvents,renderPromos,renderSales];

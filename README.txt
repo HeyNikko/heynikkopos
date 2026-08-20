@@ -504,3 +504,43 @@ The event's stock was already settled during the V8.5 Close Event transaction.
 
 Offline deletes are queued and hidden locally.
 While an event delete is pending, cloud pulls suppress that event so it cannot reappear.
+
+
+V8.5.2 — LIVE EVENT LIFECYCLE SYNC
+----------------------------------
+Run SUPABASE_V8_5_2_SETUP.sql once before using this build.
+
+ROOT CAUSES FIXED
+-----------------
+1. The Realtime channel did not subscribe to the public.events table.
+   Event creation / close status therefore did not immediately reach other devices.
+
+2. Background save() used to schedule syncEventsToCloud(), which uploaded EVERY local event.
+   A stale PC with an event still marked OPEN could overwrite the CLOSED status written by the iPad.
+
+NEW EVENT SYNC MODEL
+--------------------
+- Local event edits are tracked in a Pending Events queue.
+- Only events deliberately changed on this device are pushed to Supabase.
+- Normal login/background sync does NOT upload the entire local event history.
+- Cloud Events are pulled every 15 seconds as fallback.
+- Returning to the tab/app immediately pulls Events.
+- public.events is subscribed through Supabase Realtime.
+- Event creation, stock management and local event changes sync automatically.
+- Closing an event uses the V8.5 atomic close_pos_event() transaction.
+- After close, every other online device receives CLOSED state automatically.
+- Event deletion continues to use the V8.5.1 permanent cloud-delete queue.
+
+EXPECTED CROSS-DEVICE FLOW
+--------------------------
+iPad creates event
+→ event + inventory upload to Supabase
+→ PC receives events Realtime update
+→ PC shows event.
+
+PC closes event
+→ Supabase atomic close returns unsold stock + marks event CLOSED
+→ iPad receives Events + Product + Event Inventory Realtime updates
+→ iPad removes it from active POS and shows CLOSED in Event History.
+
+The reverse direction works the same way.

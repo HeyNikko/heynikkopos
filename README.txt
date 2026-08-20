@@ -478,3 +478,29 @@ RECOVERY
 Export > Cloud Sync > Advanced sync tools > Recover Last Closed Event Stock
 
 Take a JSON backup first. Recovery uses exact local "Unsold event stock returned" movement records and only raises Master Stock to at least the quantity definitely returned at event close. It does not blindly add the same return twice.
+
+
+V8.5.1 — CLOUD-SAFE EVENT DELETE
+--------------------------------
+Run SUPABASE_V8_5_1_SETUP.sql once before using this build.
+
+FIXED
+-----
+Deleting a closed event previously removed it only from the browser.
+Supabase still had the event, so Pull Events / background sync downloaded it again.
+
+V8.5.1 permanently deletes:
+- the closed event
+- its event_inventory rows
+- that event's sale_items
+- that event's sales
+
+INVENTORY SAFETY
+----------------
+Deleting closed history does NOT move inventory.
+
+Master Stock is NOT increased or reduced during Event Delete.
+The event's stock was already settled during the V8.5 Close Event transaction.
+
+Offline deletes are queued and hidden locally.
+While an event delete is pending, cloud pulls suppress that event so it cannot reappear.

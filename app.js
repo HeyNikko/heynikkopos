@@ -6,6 +6,7 @@ const CLOUD_PENDING_SALES_KEY='heynikko_pos_v8_pending_sales';
 const CLOUD_SALES_ERRORS_KEY='heynikko_pos_v8_sales_errors';
 const CLOUD_PENDING_VOIDS_KEY='heynikko_pos_v8_pending_voids';
 const CLOUD_PENDING_DELETES_KEY='heynikko_pos_v8_pending_deletes';
+const CLOUD_PENDING_EVENT_DELETES_KEY='heynikko_pos_v8_pending_event_deletes';
 
 const CATEGORIES=['Stickers','Sticker Sheets','Keychain','Postcard','Lifestyle'];
 const DEFAULT_BUNDLES=[
@@ -171,7 +172,7 @@ function eventSales(e){return db.sales.filter(s=>s.eventId===e.id&&activeSale(s)
 let eventListSearch='',eventListCategory='';let eventDraft={selected:{},qty:{},search:'',category:''};let manageDraft={eventId:'',active:{},target:{},search:'',category:''};
 function eventSoldQty(e,pid){return eventSales(e).reduce((n,s)=>n+s.items.filter(i=>i.productId===pid).reduce((a,i)=>a+i.qty,0),0)}
 function eventActiveIds(e){return db.products.filter(p=>e.activeProducts?.[p.id]).map(p=>p.id)}
-function renderEvents(){const cur=currentEvent();$('#currentEventPanel').innerHTML=cur?renderCurrentEvent(cur):'<div class="empty-event"><strong>No open event selected.</strong><span>Create an event to allocate booth inventory.</span></div>';$('#eventsTable').innerHTML=db.events.slice().sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt)).map(e=>`<tr><td><strong>${esc(e.name)}</strong></td><td>${fmtDate(e.start)}${e.end&&e.end!==e.start?' – '+fmtDate(e.end):''}</td><td><span class="status-pill ${e.status==='closed'?'voided':'active'}">${e.status==='closed'?'CLOSED':'OPEN'}</span></td><td>${money(eventRevenue(e))}</td><td>${eventUnitsSold(e)}</td><td><div class="action-row">${e.status==='open'?`<button class="ghost" data-use-event="${e.id}">${db.currentEventId===e.id?'Using':'Use POS'}</button><button class="danger-btn" data-close-event="${e.id}">Close</button>`:`<button class="ghost" data-view-event="${e.id}">View</button><button class="danger-btn" data-delete-event="${e.id}">Delete</button>`}</div></td></tr>`).join('')||'<tr><td colspan="6" class="muted">No events yet.</td></tr>';
+function renderEvents(){const cur=currentEvent();$('#currentEventPanel').innerHTML=cur?renderCurrentEvent(cur):'<div class="empty-event"><strong>No open event selected.</strong><span>Create an event to allocate booth inventory.</span></div>';$('#eventsTable').innerHTML=db.events.filter(e=>!e.deletedPending).slice().sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt)).map(e=>`<tr><td><strong>${esc(e.name)}</strong></td><td>${fmtDate(e.start)}${e.end&&e.end!==e.start?' – '+fmtDate(e.end):''}</td><td><span class="status-pill ${e.status==='closed'?'voided':'active'}">${e.status==='closed'?'CLOSED':'OPEN'}</span></td><td>${money(eventRevenue(e))}</td><td>${eventUnitsSold(e)}</td><td><div class="action-row">${e.status==='open'?`<button class="ghost" data-use-event="${e.id}">${db.currentEventId===e.id?'Using':'Use POS'}</button><button class="danger-btn" data-close-event="${e.id}">Close</button>`:`<button class="ghost" data-view-event="${e.id}">View</button><button class="danger-btn" data-delete-event="${e.id}">Delete</button>`}</div></td></tr>`).join('')||'<tr><td colspan="6" class="muted">No events yet.</td></tr>';
 $$('[data-use-event]').forEach(b=>b.onclick=()=>{db.currentEventId=b.dataset.useEvent;db.cart=[];save();renderAll();switchView('pos');toast('Event selected')});$$('[data-close-event]').forEach(b=>b.onclick=()=>closeEvent(b.dataset.closeEvent));$$('[data-view-event]').forEach(b=>b.onclick=()=>viewClosedEvent(b.dataset.viewEvent));
 const s=$('#eventProductSearch');if(s)s.oninput=e=>{eventListSearch=e.target.value;renderEvents()};const c=$('#eventProductCategory');if(c)c.onchange=e=>{eventListCategory=e.target.value;renderEvents()};const m=$('[data-manage-event]');if(m)m.onclick=()=>openManageEvent(m.dataset.manageEvent);$$('[data-event-stock]').forEach(b=>b.onclick=()=>openEventStock(cur?.id,b.dataset.eventStock))}
 function renderCurrentEvent(e){const cats=[...new Set([...CATEGORIES,...db.products.map(p=>p.category).filter(Boolean)])];const q=eventListSearch.toLowerCase(),cat=eventListCategory;const list=db.products.filter(p=>e.activeProducts?.[p.id]&&(!cat||p.category===cat)&&(p.name+' '+p.sku).toLowerCase().includes(q));const rows=list.map(p=>{const current=e.stock[p.id]||0,opening=e.opening[p.id]||0,added=e.added[p.id]||0,sold=eventSoldQty(e,p.id);return`<tr><td>${productImageHtml(p,'table-thumb')}</td><td>${esc(p.name)}<div class="muted">${esc(p.sku)}</div></td><td>${p.stock}</td><td>${opening}</td><td>${added}</td><td>${sold}</td><td><strong>${current}</strong></td><td><button class="ghost" data-event-stock="${p.id}">+ Add Event Stock</button></td></tr>`}).join('');return`<div class="current-event-card"><div class="event-head"><div><span class="eyebrow">CURRENT EVENT</span><h3>${esc(e.name)}</h3><p>${fmtDate(e.start)}${e.end&&e.end!==e.start?' – '+fmtDate(e.end):''} · ${money(eventRevenue(e))} sales · ${eventUnitsSold(e)} units sold · ${eventActiveIds(e).length} active products</p></div><div class="action-row"><button class="primary" data-manage-event="${e.id}">Manage Products & Stock</button><button class="ghost" data-open-pos>Open POS</button><button class="danger-btn" data-close-current>Close Event</button></div></div><div class="event-list-tools"><input id="eventProductSearch" value="${esc(eventListSearch)}" placeholder="Search active event products…"><select id="eventProductCategory"><option value="">All categories</option>${cats.map(x=>`<option value="${esc(x)}" ${x===cat?'selected':''}>${esc(x)}</option>`).join('')}</select></div><div class="table-wrap"><table><thead><tr><th>Image</th><th>Product</th><th>Master</th><th>Initial</th><th>Added</th><th>Sold</th><th>Event Left</th><th>Action</th></tr></thead><tbody>${rows||'<tr><td colspan="8" class="muted">No matching products.</td></tr>'}</tbody></table></div></div>`}
@@ -327,7 +328,47 @@ async function deleteSalePermanently(id){
     else toast('Sale hidden locally · cloud delete pending');
   }else toast('Sale hidden locally · delete queued');
 }
-function deletePastEvent(id){const e=eventById(id);if(!e||e.status!=='closed')return toast('Only closed events can be permanently deleted');const sales=db.sales.filter(s=>s.eventId===e.id);const active=sales.filter(activeSale);if(!confirm(`Delete ${e.name} permanently?\n\nThis will remove the event and its ${sales.length} sale record(s). Active sales will be reversed back into Master Stock. This cannot be undone.`))return;for(const s of active)for(const i of s.items){const p=prod(i.productId);if(p)p.stock+=i.qty}const receipts=new Set(sales.map(s=>s.receipt));db.sales=db.sales.filter(s=>s.eventId!==e.id);db.movements=db.movements.filter(m=>m.eventId!==e.id&&!receipts.has(m.receipt));db.events=db.events.filter(x=>x.id!==e.id);if(db.currentEventId===e.id)db.currentEventId='';save();renderAll();toast('Past event permanently deleted')}
+async function deletePastEvent(id){
+  const e=eventById(id);
+  if(!e||e.status!=='closed')return toast('Only closed events can be permanently deleted');
+
+  const sales=db.sales.filter(s=>s.eventId===e.id);
+
+  if(!confirm(
+    `Delete ${e.name} permanently?\n\n`+
+    `This removes the closed event, its Event Inventory, and ${sales.length} sale record${sales.length===1?'':'s'} from this POS and Supabase.\n\n`+
+    `Master Stock will NOT change because inventory was already settled when the event was closed.\n\n`+
+    `This cannot be undone.`
+  ))return;
+
+  e.deletedPending=true;
+  e.deletedAt=nowISO();
+
+  for(const s of sales){
+    s.deletedPending=true;
+    s.deletedWithEvent=true;
+  }
+
+  queueEventDeleteForCloud(e.id);
+  persistLocal();
+  renderAll();
+
+  if(cloudSession&&sb&&navigator.onLine){
+    toast('Deleting event history from cloud…');
+    const ok=await syncPendingEventDeletes(false);
+
+    if(ok){
+      await pullCloudEvents({showToast:false});
+      await pullCloudSales({showToast:false});
+      renderAll();
+      toast('Event and its sales history permanently deleted');
+    }else{
+      toast('Event hidden locally · cloud delete pending');
+    }
+  }else{
+    toast('Event hidden locally · cloud delete queued');
+  }
+}
 
 function cloudImageKey(p){const x=p?.image||'';return x.startsWith('data:')?`${x.slice(0,48)}:${x.length}`:x}
 function cloudRowToLocalProduct(r,old=null){
@@ -360,7 +401,7 @@ function setPendingProductIds(set){localStorage.setItem(CLOUD_PENDING_KEY,JSON.s
 function captureChangedProducts(){if(!cloudProductSnapshot.size){resetProductCloudSnapshot();return}const pending=getPendingProductIds();for(const p of db.products){const fp=cloudFingerprint(p),old=cloudProductSnapshot.get(p.id);if(old!==undefined&&old!==fp)pending.add(p.id);if(old===undefined)pending.add(p.id)}setPendingProductIds(pending);renderCloudPanel();scheduleCloudProductSync()}
 function scheduleCloudProductSync(){if(cloudSyncTimer)clearTimeout(cloudSyncTimer);if(!navigator.onLine||!cloudSession||!sb)return;cloudSyncTimer=setTimeout(()=>syncPendingProducts(false),1000)}
 function setCloudStatus(text,state='off'){const b=$('#cloudBadge');if(b){b.textContent=text;b.className=`cloud-badge cloud-${state}`}const p=$('#cloudPanelStatus');if(p){p.textContent=text.replace('Cloud: ','');p.className=`status-pill cloud-panel-${state}`}}
-function renderCloudPanel(extra=''){const stats=$('#cloudSyncStats');if(stats){const pending=getPendingProductIds().size;stats.innerHTML=`<span>Local products: <strong>${db.products.length}</strong></span><span>Cloud products: <strong id="cloudCountValue">${window.__cloudProductCount??'—'}</strong></span><span>Pending products: <strong>${pending}</strong></span><span>Pending sales: <strong>${getPendingSaleIds().size}</strong></span><span>Pending voids: <strong>${getPendingVoidIds().size}</strong></span><span>Pending deletes: <strong>${getPendingDeleteIds().size}</strong></span>`}const pr=$('#cloudProgress');if(pr&&extra)pr.textContent=extra;const account=$('#cloudAccountBtn');if(account)account.textContent=cloudSession?.user?.email||'Sign in'}
+function renderCloudPanel(extra=''){const stats=$('#cloudSyncStats');if(stats){const pending=getPendingProductIds().size;stats.innerHTML=`<span>Local products: <strong>${db.products.length}</strong></span><span>Cloud products: <strong id="cloudCountValue">${window.__cloudProductCount??'—'}</strong></span><span>Pending products: <strong>${pending}</strong></span><span>Pending sales: <strong>${getPendingSaleIds().size}</strong></span><span>Pending voids: <strong>${getPendingVoidIds().size}</strong></span><span>Pending deletes: <strong>${getPendingDeleteIds().size}</strong></span><span>Pending event deletes: <strong>${getPendingEventDeleteIds().size}</strong></span>`}const pr=$('#cloudProgress');if(pr&&extra)pr.textContent=extra;const account=$('#cloudAccountBtn');if(account)account.textContent=cloudSession?.user?.email||'Sign in'}
 async function refreshCloudProductCount(){if(!sb||!cloudSession)return;const {count,error}=await sb.from('products').select('*',{count:'exact',head:true});if(!error){window.__cloudProductCount=count||0;renderCloudPanel()}}
 function safeFileName(s){return String(s||'product').replace(/[^a-z0-9_-]+/gi,'-').replace(/^-+|-+$/g,'').toLowerCase()||'product'}
 async function uploadCloudProductImage(p){const src=p.image||'';if(!src||!src.startsWith('data:'))return src||null;const res=await fetch(src);const blob=await res.blob();const ext=blob.type.includes('png')?'png':'jpg';const path=`products/${safeFileName(p.sku)}-${Date.now()}.${ext}`;const {error}=await sb.storage.from('product-images').upload(path,blob,{contentType:blob.type||'image/jpeg',upsert:true});if(error)throw error;const {data}=sb.storage.from('product-images').getPublicUrl(path);return data?.publicUrl||null}
@@ -463,6 +504,10 @@ async function syncMissingProductImages(){
 
 
 
+function getPendingEventDeleteIds(){try{return new Set(JSON.parse(localStorage.getItem(CLOUD_PENDING_EVENT_DELETES_KEY)||'[]'))}catch{return new Set()}}
+function setPendingEventDeleteIds(set){localStorage.setItem(CLOUD_PENDING_EVENT_DELETES_KEY,JSON.stringify([...set]));renderCloudPanel()}
+function queueEventDeleteForCloud(id){const q=getPendingEventDeleteIds();q.add(id);setPendingEventDeleteIds(q)}
+function pendingDeletedEventCloudIds(){return new Set(db.events.filter(e=>e.deletedPending&&e.cloudId).map(e=>String(e.cloudId)))}
 function getPendingDeleteIds(){try{return new Set(JSON.parse(localStorage.getItem(CLOUD_PENDING_DELETES_KEY)||'[]'))}catch{return new Set()}}
 function setPendingDeleteIds(set){localStorage.setItem(CLOUD_PENDING_DELETES_KEY,JSON.stringify([...set]));renderCloudPanel()}
 function queueDeleteForCloud(id){const q=getPendingDeleteIds();q.add(id);setPendingDeleteIds(q);scheduleCloudSaleSync()}
@@ -677,7 +722,7 @@ async function pullCloudSales(options={}){
   try{
     const {sales,items}=await fetchCloudSales();
     const localById=new Map(db.sales.map(s=>[String(s.id),s]));
-    let rebuilt=sales.map(r=>{
+    let rebuilt=sales.filter(r=>!pendingDeletedEventCloudIds().has(String(r.event_id))).map(r=>{
       const old=localById.get(String(r.local_id||''));
       const ev=db.events.find(e=>String(e.cloudId||'')===String(r.event_id||''));
       const saleItems=items.filter(i=>String(i.sale_id)===String(r.id)).map(i=>{
@@ -822,6 +867,70 @@ async function syncEventsToCloud(showToast=true){
     return false;
   }
 }
+async function pushEventDeleteToCloud(e){
+  if(!e)return true;
+
+  if(!e.cloudId){
+    const receipts=new Set(db.sales.filter(s=>s.eventId===e.id).map(s=>s.receipt));
+    db.sales=db.sales.filter(s=>s.eventId!==e.id);
+    db.movements=db.movements.filter(m=>m.eventId!==e.id&&!receipts.has(m.receipt));
+    db.events=db.events.filter(x=>x.id!==e.id);
+    persistLocal();
+    return true;
+  }
+
+  const {error}=await sb.rpc('delete_pos_event',{
+    p_event_id:e.cloudId,
+    p_local_id:e.id
+  });
+  if(error)throw error;
+
+  const receipts=new Set(db.sales.filter(s=>s.eventId===e.id).map(s=>s.receipt));
+  db.sales=db.sales.filter(s=>s.eventId!==e.id);
+  db.movements=db.movements.filter(m=>m.eventId!==e.id&&!receipts.has(m.receipt));
+  db.events=db.events.filter(x=>x.id!==e.id);
+  persistLocal();
+  return true;
+}
+
+async function syncPendingEventDeletes(showToast=true){
+  if(!cloudSession||!sb){if(showToast)openCloudLogin();return false}
+  if(!navigator.onLine){if(showToast)toast('Offline — event delete queued');return false}
+
+  const pending=getPendingEventDeleteIds();
+  if(!pending.size)return true;
+
+  setCloudStatus('Cloud: deleting event','syncing');
+  let failed=[];
+
+  for(const id of [...pending]){
+    const e=db.events.find(x=>x.id===id);
+    if(!e){pending.delete(id);continue}
+
+    try{
+      await pushEventDeleteToCloud(e);
+      pending.delete(id);
+      setPendingEventDeleteIds(pending);
+    }catch(err){
+      console.error('Cloud event delete failed',err);
+      failed.push(`${e.name}: ${formatCloudError(err)}`);
+    }
+  }
+
+  setPendingEventDeleteIds(pending);
+
+  if(failed.length){
+    setCloudStatus('Cloud: event delete pending','warn');
+    renderCloudPanel(`Event delete pending: ${failed.slice(0,3).join(' · ')}`);
+    if(showToast)toast('Some event deletes are still pending');
+    return false;
+  }
+
+  setCloudStatus('Cloud: synced','on');
+  if(showToast)toast('Event permanently deleted from cloud');
+  return true;
+}
+
 async function pullCloudEvents(options={}){
   if(!cloudSession||!sb){if(options.showToast!==false)openCloudLogin();return false}
   if(!navigator.onLine){if(options.showToast!==false)toast('Offline — cannot pull events');return false}
@@ -832,10 +941,13 @@ async function pullCloudEvents(options={}){
     if(invErr)throw invErr;
     if(!events?.length)return;
 
+    const pendingLocalDeletes=getPendingEventDeleteIds();
+    const pendingCloudDeletes=pendingDeletedEventCloudIds();
     const existingByLocal=new Map(db.events.map(e=>[String(e.id),e]));
     const existingByCloud=new Map(db.events.filter(e=>e.cloudId).map(e=>[String(e.cloudId),e]));
     const rebuilt=[];
     for(const r of events){
+      if(pendingLocalDeletes.has(r.local_id)||pendingCloudDeletes.has(String(r.id)))continue;
       const localId=r.local_id||`cloud_event_${r.id}`;
       const old=existingByLocal.get(String(localId))||existingByCloud.get(String(r.id));
       const ev={
@@ -861,7 +973,8 @@ async function pullCloudEvents(options={}){
       }
       rebuilt.push(ev);
     }
-    db.events=rebuilt;
+    const tombstones=db.events.filter(e=>e.deletedPending&&pendingLocalDeletes.has(e.id));
+    db.events=[...tombstones,...rebuilt];
     const open=db.events.filter(e=>e.status==='open');
     if(!eventById(db.currentEventId)||eventById(db.currentEventId)?.status!=='open'){
       db.currentEventId=open.length?open[open.length-1].id:'';
@@ -1073,6 +1186,7 @@ async function syncCloudWorkspace(){
   }
   try{await syncPromotionsToCloud();await pullCloudPromotions()}catch(e){console.warn('Promotion cloud sync skipped',e)}
   await syncPendingDeletes(false);
+    await syncPendingEventDeletes(false);
   await syncPendingVoids(false);
   await syncPendingSales(false);
   await pullCloudSales({showToast:false});
@@ -1201,6 +1315,7 @@ async function refreshCloudAfterFocus(){
   cloudFocusRefreshBusy=true;
   try{
     await syncPendingDeletes(false);
+    await syncPendingEventDeletes(false);
     await syncPendingVoids(false);
     await syncPendingSales(false);
     await syncPendingProducts(false);
@@ -1222,6 +1337,7 @@ function startCloudWorkspacePoller(){
     if(!cloudSession||!sb||!navigator.onLine)return;
     try{
       await syncPendingDeletes(false);
+    await syncPendingEventDeletes(false);
       await syncPendingVoids(false);
       await syncPendingSales(false);
       await syncPendingProducts(false);

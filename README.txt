@@ -447,3 +447,13 @@ V8.4.5 — POS CATEGORY STATE FIX
   1. the user taps All, or
   2. the selected category is no longer available in the configured category list.
 - No Supabase SQL changes are required.
+
+
+V8.4.6 — CATEGORY BUTTON DISPLAY FIX
+------------------------------------
+- Fixed the category row disappearing in V8.4.5.
+- Root cause: the renderer referenced #posCategoryButtons, but the actual HTML container is #categoryButtons.
+- Restored All, Stickers, Sticker Sheets, Keychain, Postcard and Lifestyle buttons.
+- Kept the V8.4.5 persistent category-state fix, so background sync should no longer force the POS back to All.
+- Restored the original category button styling class.
+- No Supabase SQL changes are required.

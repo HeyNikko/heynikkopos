@@ -1352,11 +1352,11 @@ function toggleLowStockPanel(button){
 
 
 function renderPosCategoryButtons(){
-  const wrap=$('#posCategoryButtons');if(!wrap)return;
+  const wrap=$('#categoryButtons');if(!wrap)return;
   const available=new Set(CATEGORIES);
   if(posCategoryState&&!available.has(posCategoryState))posCategoryState='';
   const current=posCategoryState;
-  wrap.innerHTML=['',...CATEGORIES].map(c=>`<button type="button" class="${c===current?'active':''}" data-pos-category="${esc(c)}">${c||'All'}</button>`).join('');
+  wrap.innerHTML=['',...CATEGORIES].map(c=>`<button type="button" class="v72-category-btn ${c===current?'active':''}" data-pos-category="${esc(c)}">${c||'All'}</button>`).join('');
   const select=$('#categoryFilter');
   if(select)select.value=current;
   $$('[data-pos-category]').forEach(b=>b.onclick=()=>{

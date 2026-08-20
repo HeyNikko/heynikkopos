@@ -457,3 +457,24 @@ V8.4.6 — CATEGORY BUTTON DISPLAY FIX
 - Kept the V8.4.5 persistent category-state fix, so background sync should no longer force the POS back to All.
 - Restored the original category button styling class.
 - No Supabase SQL changes are required.
+
+
+V8.5 — INVENTORY SAFETY / EVENT CLOSE FIX
+-----------------------------------------
+Run SUPABASE_V8_5_SETUP.sql once before closing another event.
+
+ROOT CAUSE FIXED
+Live product refresh could overwrite local Master Stock while a multi-product stock upload was still running, then clear the pending queue.
+
+PROTECTIONS
+- Cloud product refresh never overwrites locally pending Master Stock/product changes.
+- Realtime waits during local product upload.
+- Pending product changes are pushed before background/focus cloud pulls.
+- Event Close is atomic in Supabase: remaining Event Stock returns to Master Stock and the event closes in the same database transaction.
+- Event Close is intentionally blocked while offline/signed out.
+- Pending sales, voids and deletes must finish syncing before an event can close.
+
+RECOVERY
+Export > Cloud Sync > Advanced sync tools > Recover Last Closed Event Stock
+
+Take a JSON backup first. Recovery uses exact local "Unsold event stock returned" movement records and only raises Master Stock to at least the quantity definitely returned at event close. It does not blindly add the same return twice.

@@ -10,11 +10,11 @@
   <title>HeyNikko POS</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
-  <link rel="stylesheet" href="styles.css?v=8.4.6">
+  <link rel="stylesheet" href="styles.css?v=8.5">
 </head>
 <body>
 <header>
-  <div><strong>☀️ HeyNikko POS</strong><span id="appVersion" class="version-badge">V8.4.6</span><span id="offlineBadge">Offline ready</span><span id="cloudBadge" class="cloud-badge cloud-off">Cloud: signed out</span><button id="cloudAccountBtn" class="cloud-account-btn" type="button">Sign in</button></div>
+  <div><strong>☀️ HeyNikko POS</strong><span id="appVersion" class="version-badge">V8.5</span><span id="offlineBadge">Offline ready</span><span id="cloudBadge" class="cloud-badge cloud-off">Cloud: signed out</span><button id="cloudAccountBtn" class="cloud-account-btn" type="button">Sign in</button></div>
   <nav>
     <button class="tab active" data-view="pos">POS</button>
     <button class="tab" data-view="events">Events</button>
@@ -103,6 +103,7 @@
           <button id="cloudImageSyncBtn" class="ghost" type="button">Sync Missing Images</button>
           <button id="cloudEventPushBtn" class="ghost" type="button">Sync Events Only</button>
           <button id="cloudEventPullBtn" class="ghost" type="button">Pull Events Only</button>
+          <button id="inventoryRecoveryBtn" class="ghost" type="button">Recover Last Closed Event Stock</button>
         </div>
       </details>
       <div class="cloud-actions"><button id="cloudSignOutBtn" class="ghost" type="button">Sign Out</button></div>
@@ -178,7 +179,7 @@
         try{await load(src);break}catch(e){window.__supabaseLoadError=e.message}
       }
     }
-    const a=document.createElement('script');a.src='app.js?v=8.4.6';a.defer=false;document.body.appendChild(a);
+    const a=document.createElement('script');a.src='app.js?v=8.5';a.defer=false;document.body.appendChild(a);
   }
   boot();
 })();

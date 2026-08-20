@@ -10,11 +10,11 @@
   <title>HeyNikko POS</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
-  <link rel="stylesheet" href="styles.css?v=8.4.3">
+  <link rel="stylesheet" href="styles.css?v=8.4.4">
 </head>
 <body>
 <header>
-  <div><strong>☀️ HeyNikko POS</strong><span id="appVersion" class="version-badge">V8.4.3</span><span id="offlineBadge">Offline ready</span><span id="cloudBadge" class="cloud-badge cloud-off">Cloud: signed out</span><button id="cloudAccountBtn" class="cloud-account-btn" type="button">Sign in</button></div>
+  <div><strong>☀️ HeyNikko POS</strong><span id="appVersion" class="version-badge">V8.4.4</span><span id="offlineBadge">Offline ready</span><span id="cloudBadge" class="cloud-badge cloud-off">Cloud: signed out</span><button id="cloudAccountBtn" class="cloud-account-btn" type="button">Sign in</button></div>
   <nav>
     <button class="tab active" data-view="pos">POS</button>
     <button class="tab" data-view="events">Events</button>
@@ -148,7 +148,7 @@
 
 <dialog id="promoDialog"><form method="dialog" id="promoForm">
   <h3>Add Promotion</h3><label>Promotion type<select id="promoType"><option value="bundle">Category bundle price</option><option value="gift">Product free gift</option></select></label>
-  <div id="bundlePromoFields"><label>Eligible categories</label><div id="promoCategoryChecks" class="category-checks"></div><label>Bundle quantity<input id="bundleQty" type="number" min="1" step="1" value="5" required></label><label>Bundle price ($)<input id="bundlePrice" type="number" min="0" step="0.01" value="10.00" required></label></div>
+  <div id="bundlePromoFields"><label>Applies to<select id="bundleTargetType"><option value="categories">Selected categories</option><option value="products">Selected products</option></select></label><div id="bundleCategoryTarget"><label>Eligible categories</label><div id="promoCategoryChecks" class="category-checks"></div></div><div id="bundleProductTarget" hidden><label>Eligible products</label><input id="promoProductSearch" type="search" placeholder="Search product or SKU…"><div class="promo-product-actions"><button type="button" id="promoSelectVisible" class="ghost">Select visible</button><button type="button" id="promoClearProducts" class="ghost">Clear</button><span id="promoProductCount" class="muted">0 selected</span></div><div id="promoProductChecks" class="promo-product-checks"></div></div><label>Bundle quantity<input id="bundleQty" type="number" min="1" step="1" value="5" required></label><label>Bundle price ($)<input id="bundlePrice" type="number" min="0" step="0.01" value="10.00" required></label></div>
   <div id="giftPromoFields" hidden><label>Customer buys<select id="promoBuy"></select></label><label>Buy quantity<input id="promoBuyQty" type="number" min="1" step="1" value="2"></label><label>Free gift<select id="promoGift"></select></label><label>Gift quantity<input id="promoGiftQty" type="number" min="1" step="1" value="1"></label></div>
   <menu><button value="cancel" class="ghost">Cancel</button><button value="default" class="primary">Save</button></menu>
 </form></dialog>
@@ -178,7 +178,7 @@
         try{await load(src);break}catch(e){window.__supabaseLoadError=e.message}
       }
     }
-    const a=document.createElement('script');a.src='app.js?v=8.4.3';a.defer=false;document.body.appendChild(a);
+    const a=document.createElement('script');a.src='app.js?v=8.4.4';a.defer=false;document.body.appendChild(a);
   }
   boot();
 })();

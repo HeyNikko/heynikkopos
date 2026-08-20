@@ -426,3 +426,12 @@ V8.4.3 — NEW PRODUCT CATEGORIES
 - Lifestyle
 - Sticker Sheets
 These are available in Add/Edit Product, POS category filters and promotion category selection.
+
+
+V8.4.4 — SELECTED PRODUCT BUNDLE PROMOS
+- Added bundle targeting by Selected Products.
+- Example: select only Cap SKUs, set quantity 2 and bundle price $40.
+- Cap A + Cap B, or 2 x Cap A, qualifies.
+- Other Lifestyle products do not qualify unless explicitly selected.
+- Existing category bundle promos remain supported.
+- No Supabase SQL change required.

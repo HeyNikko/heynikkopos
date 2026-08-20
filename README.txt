@@ -435,3 +435,15 @@ V8.4.4 — SELECTED PRODUCT BUNDLE PROMOS
 - Other Lifestyle products do not qualify unless explicitly selected.
 - Existing category bundle promos remain supported.
 - No Supabase SQL change required.
+
+
+V8.4.5 — POS CATEGORY STATE FIX
+-------------------------------
+- Fixed POS category buttons occasionally jumping back to All.
+- The selected category is now stored separately from the dropdown DOM.
+- Background Realtime refreshes, product cloud pulls, renderAll(), cart changes and stock refreshes preserve the current category.
+- The selected category is also remembered in browser localStorage.
+- The POS only falls back to All if:
+  1. the user taps All, or
+  2. the selected category is no longer available in the configured category list.
+- No Supabase SQL changes are required.

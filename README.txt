@@ -579,3 +579,26 @@ V8.5.3:
 - true sale edits are synced to Supabase and other devices
 
 updated_at is now treated only as a technical database timestamp.
+
+
+V8.5.4 — SALES DATE RANGE FILTER
+--------------------------------
+No Supabase SQL changes are required.
+
+Sales tab now supports:
+- Custom From / To dates
+- Today
+- Last 7 Days
+- This Month
+- All Time
+
+The Sales summary follows the selected date range:
+- Revenue
+- Transactions
+- Units Sold
+
+The transaction table also shows only sales inside the selected period.
+Void transactions remain visible in the filtered history but are excluded from Revenue / Transactions / Units Sold totals.
+
+The selected range is remembered on the device.
+Select All now selects only transactions currently visible inside the chosen date range.

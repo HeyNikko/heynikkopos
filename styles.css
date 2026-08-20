@@ -271,3 +271,13 @@ select,select.ios-select{color:#332b22!important;-webkit-text-fill-color:#332b22
 .status-pill.voided{opacity:.82}
 
 .promo-product-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0}.promo-product-checks{max-height:260px;overflow:auto;border:1px solid #eadfcf;border-radius:12px;background:#fff}.promo-product-option{display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid #eadfcf;cursor:pointer}.promo-product-option:last-child{border-bottom:0}.promo-product-option input{width:18px;height:18px;flex:0 0 auto}.promo-product-option .promo-product-meta{display:flex;flex-direction:column;min-width:0}.promo-product-option small{color:#8b7c68}
+
+.sales-date-filter{margin:0 0 16px;padding:14px 16px;border:1px solid #eadfcf;border-radius:14px;background:#fff}
+.sales-date-filter-top{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;flex-wrap:wrap}
+.sales-date-presets{display:flex;gap:7px;flex-wrap:wrap}
+.sales-date-presets .active{font-weight:800;box-shadow:inset 0 0 0 2px currentColor}
+.sales-date-fields{display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin-top:12px}
+.sales-date-fields label{display:flex;flex-direction:column;gap:5px;font-size:12px;font-weight:700}
+.sales-date-fields input{min-width:150px}
+#salesDateRangeLabel{padding-bottom:10px}
+@media(max-width:720px){.sales-date-fields label{flex:1 1 140px}.sales-date-fields input{min-width:0;width:100%}.sales-date-filter-top{display:block}.sales-date-presets{margin-top:10px}}

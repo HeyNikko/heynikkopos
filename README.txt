@@ -544,3 +544,38 @@ PC closes event
 → iPad removes it from active POS and shows CLOSED in Event History.
 
 The reverse direction works the same way.
+
+
+V8.5.3 — CURRENT ORDER + SALES STATUS FIX
+-----------------------------------------
+Run SUPABASE_V8_5_3_SETUP.sql once before using this build.
+
+CURRENT ORDER FIX
+-----------------
+V8.5.2 pullCloudEvents() cleared db.cart every time Events refreshed.
+Because Events refresh through Realtime, focus refresh and the 15-second fallback,
+an in-progress order could disappear after a few seconds.
+
+V8.5.3 preserves Current Order when:
+- the same active Event still exists
+- the Event remains OPEN
+
+The order is cleared only when:
+- the active Event was actually closed
+- the active Event was deleted
+- the POS genuinely switches to another Event
+
+SALES STATUS FIX
+----------------
+The UI previously displayed EDITED whenever sales.updated_at existed.
+Supabase sets updated_at even for brand-new confirmed sales, so all synced sales
+incorrectly showed EDITED.
+
+V8.5.3:
+- adds sales.edited_at
+- COMPLETED = normal confirmed sale
+- EDITED = only a sale deliberately changed through Edit Sale
+- VOIDED remains unchanged
+- true sale edits are synced to Supabase and other devices
+
+updated_at is now treated only as a technical database timestamp.

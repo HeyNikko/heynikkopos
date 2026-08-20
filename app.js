@@ -99,6 +99,7 @@ async function checkout(method){
       receipt:'HN-'+new Date().toISOString().replace(/\D/g,'').slice(2,14),
       createdAt:nowISO(),
       updatedAt:null,
+      editedAt:null,
       payment:method,
       subtotal:pricing.subtotal,
       bundleDiscount:pricing.discount,
@@ -250,7 +251,7 @@ function togglePromoFields(){const gift=$('#promoType').value==='gift';$('#giftP
 function openPromo(){promoOptions();$('#promoType').value='bundle';$('#bundleTargetType').value='categories';togglePromoFields();$$('#promoCategoryChecks input').forEach(x=>x.checked=false);$('#promoProductSearch').value='';renderPromoProductChecks();$$('#promoProductChecks input').forEach(x=>x.checked=false);updatePromoProductCount();$('#bundleQty').value=5;$('#bundlePrice').value=10;$('#promoDialog').showModal()}
 function savePromoForm(e){e.preventDefault();if($('#promoType').value==='bundle'){const targetType=$('#bundleTargetType').value,categories=$$('#promoCategoryChecks input:checked').map(x=>x.value),productIds=$$('#promoProductChecks input:checked').map(x=>x.value),qty=+$('#bundleQty').value,bundlePrice=+$('#bundlePrice').value;if(targetType==='products'&&!productIds.length)return toast('Choose at least one product');if(targetType==='categories'&&!categories.length)return toast('Choose at least one category');if(!qty||qty<1)return toast('Bundle quantity must be at least 1');db.bundlePromos.push({id:uid('bp'),type:'bundle',targetType,categories:targetType==='categories'?categories:[],productIds:targetType==='products'?productIds:[],qty,bundlePrice,active:true})}else db.promos.push({id:uid('pr'),type:'gift',buy:$('#promoBuy').value,buyQty:+$('#promoBuyQty').value,gift:$('#promoGift').value,giftQty:+$('#promoGiftQty').value,active:true});save();$('#promoDialog').close();recalcPromos();renderAll();toast('Promotion saved')}
 function updateSalesBulkControls(){selectedSaleIds=new Set([...selectedSaleIds].filter(id=>db.sales.some(s=>s.id===id)));const n=selectedSaleIds.size,count=$('#salesSelectedCount'),del=$('#deleteSelectedSales'),head=$('#salesHeaderCheck');if(count)count.textContent=`${n} selected`;if(del)del.disabled=!n;if(head){head.checked=db.sales.length>0&&n===db.sales.length;head.indeterminate=n>0&&n<db.sales.length}}
-function renderSales(){const visibleSales=db.sales.filter(s=>!s.deletedPending),today=new Date(),todayKey=today.toDateString(),active=visibleSales.filter(activeSale),tod=active.filter(s=>new Date(s.createdAt).toDateString()===todayKey),sum=a=>a.reduce((n,s)=>n+s.total,0);$('#salesSummary').innerHTML=`<div class="stat"><span>Today · ${today.toLocaleDateString('en-SG',{day:'numeric',month:'short',year:'numeric'})}</span><strong>${money(sum(tod))}</strong></div><div class="stat"><span>Transactions</span><strong>${tod.length}</strong></div><div class="stat"><span>All-time</span><strong>${money(sum(active))}</strong></div>`;$('#salesTable').innerHTML=visibleSales.map(s=>{const e=eventById(s.eventId),locked=e?.status==='closed',checked=selectedSaleIds.has(s.id)?'checked':'';return`<tr class="${activeSale(s)?'':'voided-row'}"><td class="select-col"><input class="sales-check" type="checkbox" data-sale-select="${s.id}" ${checked} aria-label="Select ${esc(s.receipt)}"></td><td>${new Date(s.createdAt).toLocaleString('en-SG')}</td><td>${esc(s.eventName||'Legacy / Master')}</td><td>${esc(s.payment)}</td><td>${s.items.reduce((a,i)=>a+i.qty,0)}</td><td>${money(s.total)}</td><td><span class="status-pill ${activeSale(s)?'active':'voided'}">${activeSale(s)?(s.updatedAt?'EDITED':'COMPLETED'):'VOIDED'}${activeSale(s)&&!s.cloudSynced?' · SYNC PENDING':''}${!activeSale(s)&&!s.cloudVoidSynced?' · VOID PENDING':''}</span></td><td><div class="action-row"><button class="ghost" data-view-sale="${s.id}">View</button>${activeSale(s)&&!locked?`<button class="ghost" data-edit-sale="${s.id}">Edit</button>`:''}${activeSale(s)?`<button class="danger-btn" data-void-sale="${s.id}">Void</button>`:''}<button class="danger-btn" data-delete-sale="${s.id}">Delete</button></div></td></tr>`}).join('')||'<tr><td colspan="8" class="muted">No sales yet.</td></tr>';$$('[data-sale-select]').forEach(c=>c.onchange=()=>{if(c.checked)selectedSaleIds.add(c.dataset.saleSelect);else selectedSaleIds.delete(c.dataset.saleSelect);updateSalesBulkControls()});$$('[data-view-sale]').forEach(b=>b.onclick=()=>viewSale(b.dataset.viewSale));$$('[data-edit-sale]').forEach(b=>b.onclick=()=>openEditSale(b.dataset.editSale));$$('[data-void-sale]').forEach(b=>b.onclick=()=>voidSale(b.dataset.voidSale));$$('[data-delete-sale]').forEach(b=>b.onclick=()=>deleteSalePermanently(b.dataset.deleteSale));updateSalesBulkControls()}
+function renderSales(){const visibleSales=db.sales.filter(s=>!s.deletedPending),today=new Date(),todayKey=today.toDateString(),active=visibleSales.filter(activeSale),tod=active.filter(s=>new Date(s.createdAt).toDateString()===todayKey),sum=a=>a.reduce((n,s)=>n+s.total,0);$('#salesSummary').innerHTML=`<div class="stat"><span>Today · ${today.toLocaleDateString('en-SG',{day:'numeric',month:'short',year:'numeric'})}</span><strong>${money(sum(tod))}</strong></div><div class="stat"><span>Transactions</span><strong>${tod.length}</strong></div><div class="stat"><span>All-time</span><strong>${money(sum(active))}</strong></div>`;$('#salesTable').innerHTML=visibleSales.map(s=>{const e=eventById(s.eventId),locked=e?.status==='closed',checked=selectedSaleIds.has(s.id)?'checked':'';return`<tr class="${activeSale(s)?'':'voided-row'}"><td class="select-col"><input class="sales-check" type="checkbox" data-sale-select="${s.id}" ${checked} aria-label="Select ${esc(s.receipt)}"></td><td>${new Date(s.createdAt).toLocaleString('en-SG')}</td><td>${esc(s.eventName||'Legacy / Master')}</td><td>${esc(s.payment)}</td><td>${s.items.reduce((a,i)=>a+i.qty,0)}</td><td>${money(s.total)}</td><td><span class="status-pill ${activeSale(s)?'active':'voided'}">${activeSale(s)?(s.editedAt?'EDITED':'COMPLETED'):'VOIDED'}${activeSale(s)&&!s.cloudSynced?' · SYNC PENDING':''}${!activeSale(s)&&!s.cloudVoidSynced?' · VOID PENDING':''}</span></td><td><div class="action-row"><button class="ghost" data-view-sale="${s.id}">View</button>${activeSale(s)&&!locked?`<button class="ghost" data-edit-sale="${s.id}">Edit</button>`:''}${activeSale(s)?`<button class="danger-btn" data-void-sale="${s.id}">Void</button>`:''}<button class="danger-btn" data-delete-sale="${s.id}">Delete</button></div></td></tr>`}).join('')||'<tr><td colspan="8" class="muted">No sales yet.</td></tr>';$$('[data-sale-select]').forEach(c=>c.onchange=()=>{if(c.checked)selectedSaleIds.add(c.dataset.saleSelect);else selectedSaleIds.delete(c.dataset.saleSelect);updateSalesBulkControls()});$$('[data-view-sale]').forEach(b=>b.onclick=()=>viewSale(b.dataset.viewSale));$$('[data-edit-sale]').forEach(b=>b.onclick=()=>openEditSale(b.dataset.editSale));$$('[data-void-sale]').forEach(b=>b.onclick=()=>voidSale(b.dataset.voidSale));$$('[data-delete-sale]').forEach(b=>b.onclick=()=>deleteSalePermanently(b.dataset.deleteSale));updateSalesBulkControls()}
 function restoreSaleStockForDelete(s){const ev=eBySale(s);if(!activeSale(s))return;for(const i of s.items){const p=prod(i.productId);if(!p)continue;if(ev&&ev.status==='open'){ev.stock[p.id]=(ev.stock[p.id]||0)+i.qty;ev.activeProducts[p.id]=true}else p.stock+=i.qty}}
 async function bulkDeleteSelectedSales(){
   const ids=[...selectedSaleIds].filter(id=>db.sales.some(s=>s.id===id));
@@ -276,7 +277,7 @@ function editAllowance(s){const a={};const event=eBySale(s);for(const p of db.pr
 function openEditSale(id){const s=db.sales.find(x=>x.id===id),ev=eBySale(s);if(!s||!activeSale(s))return;if(ev?.status==='closed')return toast('Closed event sales are view-only');$('#editSaleId').value=id;$('#editSaleReceipt').textContent=`${s.receipt} · ${s.eventName||'Legacy sale'}`;$('#editSalePayment').value=s.payment;editSaleDraft=s.items.filter(i=>!i.promo).map(i=>({productId:i.productId,qty:i.qty}));promoOptions();renderEditSale();$('#saleEditDialog').showModal()}
 function renderEditSale(){const s=db.sales.find(x=>x.id===$('#editSaleId').value),allow=editAllowance(s),gifts=calcPromoItems(editSaleDraft,allow),pricing=calcBundlePricing(editSaleDraft);$('#editSaleItems').innerHTML=[...editSaleDraft.map((r,idx)=>{const p=prod(r.productId);return`<div class="edit-line"><button type="button" class="ghost remove-mini" data-edit-remove="${idx}">Remove</button><div>${esc(p?.name||'Missing')}<div class="muted">${esc(p?.sku||'')}</div></div><div class="qty"><button type="button" class="ghost" data-edit-minus="${idx}">−</button><strong>${r.qty}</strong><button type="button" class="ghost" data-edit-plus="${idx}">+</button></div></div>`}),...gifts.map(g=>{const p=prod(g.productId);return`<div class="edit-line promo-edit"><span class="promo-pill">FREE</span><div>${esc(p?.name||'Missing')}</div><strong>× ${g.qty}</strong></div>`})].join('');$('#editSaleTotal').textContent=money(pricing.total);$$('[data-edit-remove]').forEach(b=>b.onclick=()=>{editSaleDraft.splice(+b.dataset.editRemove,1);renderEditSale()});$$('[data-edit-minus]').forEach(b=>b.onclick=()=>{const r=editSaleDraft[+b.dataset.editMinus];r.qty--;if(r.qty<=0)editSaleDraft.splice(+b.dataset.editMinus,1);renderEditSale()});$$('[data-edit-plus]').forEach(b=>b.onclick=()=>{const r=editSaleDraft[+b.dataset.editPlus];if(r.qty+1>allow[r.productId])return toast('Insufficient stock');r.qty++;renderEditSale()})}
 function addProductToEdit(){const id=$('#editAddProduct').value;if(!id)return;const s=db.sales.find(x=>x.id===$('#editSaleId').value),allow=editAllowance(s),r=editSaleDraft.find(x=>x.productId===id),current=r?.qty||0;if(current>=allow[id])return toast('Insufficient stock');if(r)r.qty++;else editSaleDraft.push({productId:id,qty:1});renderEditSale()}
-function saveSaleEditForm(e){e.preventDefault();const s=db.sales.find(x=>x.id===$('#editSaleId').value),ev=eBySale(s);if(!s||!activeSale(s)||ev?.status==='closed')return;const allowance=editAllowance(s),pricing=calcBundlePricing(editSaleDraft),gifts=calcPromoItems(editSaleDraft,allowance),newItems=[...editSaleDraft.map(i=>{const p=prod(i.productId);return{productId:p.id,sku:p.sku,name:p.name,category:p.category||'',qty:i.qty,unitPrice:p.price,promo:false,promoId:''}}),...gifts.map(i=>{const p=prod(i.productId);return{productId:p.id,sku:p.sku,name:p.name,category:p.category||'',qty:i.qty,unitPrice:0,promo:true,promoId:i.promoId||''}})],needed={};for(const i of newItems)needed[i.productId]=(needed[i.productId]||0)+i.qty;for(const[id,q]of Object.entries(needed))if(q>(allowance[id]||0))return toast(`${prod(id)?.name||'Item'} has insufficient stock`);for(const old of s.items){const p=prod(old.productId);if(!p)continue;if(ev)ev.stock[p.id]=(ev.stock[p.id]||0)+old.qty;else p.stock+=old.qty;db.movements.push({id:uid('m'),createdAt:nowISO(),productId:p.id,sku:p.sku,name:p.name,delta:old.qty,scope:ev?'event':'master',eventId:ev?.id||'',eventName:ev?.name||'',reason:'Sale edit reversal',receipt:s.receipt})}for(const item of newItems){const p=prod(item.productId),avail=ev?(ev.stock[p.id]||0):p.stock;if(avail<item.qty)return toast('Stock changed before save');if(ev)ev.stock[p.id]-=item.qty;else p.stock-=item.qty;db.movements.push({id:uid('m'),createdAt:nowISO(),productId:p.id,sku:p.sku,name:p.name,delta:-item.qty,scope:ev?'event':'master',eventId:ev?.id||'',eventName:ev?.name||'',reason:item.promo?'Edited sale promo gift':'Edited sale',receipt:s.receipt})}s.items=newItems;s.payment=$('#editSalePayment').value;s.subtotal=pricing.subtotal;s.bundleDiscount=pricing.discount;s.bundlePromos=pricing.applied;s.total=pricing.total;s.updatedAt=nowISO();save();$('#saleEditDialog').close();renderAll();toast('Sale updated')}
+function saveSaleEditForm(e){e.preventDefault();const s=db.sales.find(x=>x.id===$('#editSaleId').value),ev=eBySale(s);if(!s||!activeSale(s)||ev?.status==='closed')return;const allowance=editAllowance(s),pricing=calcBundlePricing(editSaleDraft),gifts=calcPromoItems(editSaleDraft,allowance),newItems=[...editSaleDraft.map(i=>{const p=prod(i.productId);return{productId:p.id,sku:p.sku,name:p.name,category:p.category||'',qty:i.qty,unitPrice:p.price,promo:false,promoId:''}}),...gifts.map(i=>{const p=prod(i.productId);return{productId:p.id,sku:p.sku,name:p.name,category:p.category||'',qty:i.qty,unitPrice:0,promo:true,promoId:i.promoId||''}})],needed={};for(const i of newItems)needed[i.productId]=(needed[i.productId]||0)+i.qty;for(const[id,q]of Object.entries(needed))if(q>(allowance[id]||0))return toast(`${prod(id)?.name||'Item'} has insufficient stock`);for(const old of s.items){const p=prod(old.productId);if(!p)continue;if(ev)ev.stock[p.id]=(ev.stock[p.id]||0)+old.qty;else p.stock+=old.qty;db.movements.push({id:uid('m'),createdAt:nowISO(),productId:p.id,sku:p.sku,name:p.name,delta:old.qty,scope:ev?'event':'master',eventId:ev?.id||'',eventName:ev?.name||'',reason:'Sale edit reversal',receipt:s.receipt})}for(const item of newItems){const p=prod(item.productId),avail=ev?(ev.stock[p.id]||0):p.stock;if(avail<item.qty)return toast('Stock changed before save');if(ev)ev.stock[p.id]-=item.qty;else p.stock-=item.qty;db.movements.push({id:uid('m'),createdAt:nowISO(),productId:p.id,sku:p.sku,name:p.name,delta:-item.qty,scope:ev?'event':'master',eventId:ev?.id||'',eventName:ev?.name||'',reason:item.promo?'Edited sale promo gift':'Edited sale',receipt:s.receipt})}s.items=newItems;s.payment=$('#editSalePayment').value;s.subtotal=pricing.subtotal;s.bundleDiscount=pricing.discount;s.bundlePromos=pricing.applied;s.total=pricing.total;s.editedAt=nowISO();s.updatedAt=s.editedAt;queueSaleForCloud(s.id);save();$('#saleEditDialog').close();renderAll();toast('Sale updated · syncing edit')}
 async function voidSale(id){
   const s=db.sales.find(x=>x.id===id);
   if(!s||!activeSale(s))return;
@@ -595,19 +596,55 @@ async function pushSaleToCloud(sale){
   const ev=eventById(sale.eventId);
   if(!ev?.cloudId)throw new Error(`Event "${sale.eventName||''}" has not synced to cloud`);
   const items=await buildCloudSaleItems(sale);
-  const {data,error}=await sb.rpc('record_pos_sale',{
-    p_local_id:sale.id,
-    p_receipt:sale.receipt,
-    p_event_id:ev.cloudId,
-    p_event_name:sale.eventName||ev.name,
-    p_payment_method:sale.payment||'',
-    p_subtotal:Number(sale.subtotal??sale.total)||0,
-    p_discount:Number(sale.bundleDiscount||0),
-    p_total:Number(sale.total)||0,
-    p_created_at:sale.createdAt||nowISO(),
-    p_items:items
-  });
-  if(error)throw error;
+
+  let data;
+
+  if(sale.cloudId&&sale.editedAt){
+    const result=await sb.rpc('update_pos_sale_details',{
+      p_sale_id:sale.cloudId,
+      p_local_id:sale.id,
+      p_payment_method:sale.payment||'',
+      p_subtotal:Number(sale.subtotal??sale.total)||0,
+      p_discount:Number(sale.bundleDiscount||0),
+      p_total:Number(sale.total)||0,
+      p_edited_at:sale.editedAt,
+      p_items:items
+    });
+    if(result.error)throw result.error;
+    data=result.data;
+  }else{
+    const result=await sb.rpc('record_pos_sale',{
+      p_local_id:sale.id,
+      p_receipt:sale.receipt,
+      p_event_id:ev.cloudId,
+      p_event_name:sale.eventName||ev.name,
+      p_payment_method:sale.payment||'',
+      p_subtotal:Number(sale.subtotal??sale.total)||0,
+      p_discount:Number(sale.bundleDiscount||0),
+      p_total:Number(sale.total)||0,
+      p_created_at:sale.createdAt||nowISO(),
+      p_items:items
+    });
+    if(result.error)throw result.error;
+    data=result.data;
+
+    // A sale can be created and edited offline before its first cloud upload.
+    // Record the true edit marker after the initial atomic sale creation.
+    if(sale.editedAt){
+      const editResult=await sb.rpc('update_pos_sale_details',{
+        p_sale_id:data?.sale_id||sale.cloudId||null,
+        p_local_id:sale.id,
+        p_payment_method:sale.payment||'',
+        p_subtotal:Number(sale.subtotal??sale.total)||0,
+        p_discount:Number(sale.bundleDiscount||0),
+        p_total:Number(sale.total)||0,
+        p_edited_at:sale.editedAt,
+        p_items:items
+      });
+      if(editResult.error)throw editResult.error;
+    }
+  }
+
   sale.cloudSynced=true;
   sale.cloudId=data?.sale_id||sale.cloudId||'';
   sale.cloudSyncedAt=nowISO();
@@ -776,6 +813,7 @@ async function pullCloudSales(options={}){
         receipt:r.receipt||old?.receipt||'',
         createdAt:r.created_at,
         updatedAt:r.updated_at||null,
+        editedAt:old?.editedAt||r.edited_at||null,
         payment:r.payment_method||'',
         subtotal:Number(r.subtotal)||0,
         bundleDiscount:Number(r.discount)||0,
@@ -1007,6 +1045,11 @@ async function pullCloudEvents(options={}){
   if(!cloudSession||!sb){if(options.showToast!==false)openCloudLogin();return false}
   if(!navigator.onLine){if(options.showToast!==false)toast('Offline — cannot pull events');return false}
   try{
+    const previousCurrentEventId=db.currentEventId||'';
+    const previousCurrentEvent=eventById(previousCurrentEventId);
+    const previousCurrentCloudId=previousCurrentEvent?.cloudId||'';
+    const previousCart=(db.cart||[]).map(item=>({...item}));
+
     const {data:events,error:eventErr}=await sb.from('events').select('*').order('created_at');
     if(eventErr)throw eventErr;
     const {data:inventory,error:invErr}=await sb.from('event_inventory').select('*');
@@ -1060,10 +1103,22 @@ async function pullCloudEvents(options={}){
       if(!db.events.some(e=>e.id===id)&&!pendingEventChanges.has(id))cloudEventSnapshot.delete(id);
     }
     const open=db.events.filter(e=>e.status==='open');
-    if(!eventById(db.currentEventId)||eventById(db.currentEventId)?.status!=='open'){
+    const sameOpenEvent=db.events.find(e=>
+      e.status==='open'&&(
+        String(e.id)===String(previousCurrentEventId)||
+        (previousCurrentCloudId&&String(e.cloudId||'')===String(previousCurrentCloudId))
+      )
+    );
+
+    if(sameOpenEvent){
+      db.currentEventId=sameOpenEvent.id;
+      // A background Event refresh must never destroy an in-progress checkout.
+      db.cart=previousCart.filter(item=>db.products.some(p=>p.id===item.productId));
+    }else{
       db.currentEventId=open.length?open[open.length-1].id:'';
+      // Only clear the order if the event actually changed / closed / disappeared.
+      db.cart=[];
     }
-    db.cart=[];
     persistLocal();
     try{renderAll()}catch(renderErr){console.error('Event data loaded; UI refresh warning',renderErr)}
     renderCloudPanel(`Loaded ${db.events.length} cloud event${db.events.length===1?'':'s'}. Active: ${eventById(db.currentEventId)?.name||'none'}.`);

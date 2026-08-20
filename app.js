@@ -7,7 +7,7 @@ const CLOUD_SALES_ERRORS_KEY='heynikko_pos_v8_sales_errors';
 const CLOUD_PENDING_VOIDS_KEY='heynikko_pos_v8_pending_voids';
 const CLOUD_PENDING_DELETES_KEY='heynikko_pos_v8_pending_deletes';
 
-const CATEGORIES=['Stickers','Sticker Sheets','Keychain','Postcard'];
+const CATEGORIES=['Stickers','Sticker Sheets','Keychain','Postcard','Lifestyle'];
 const DEFAULT_BUNDLES=[
  {id:'bp-sticker-postcard',type:'bundle',categories:['Stickers','Postcard'],qty:5,bundlePrice:10,active:true},
  {id:'bp-sticker-sheets',type:'bundle',categories:['Sticker Sheets'],qty:3,bundlePrice:18,active:true},

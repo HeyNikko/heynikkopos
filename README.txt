@@ -420,3 +420,9 @@ IMPORTANT INVENTORY DISTINCTION
 - Event Stock = event_inventory.current_qty
 Changing Master Stock does NOT automatically change stock already allocated to an active event.
 It only updates the unallocated Master Stock quantity on every device.
+
+
+V8.4.3 — NEW PRODUCT CATEGORIES
+- Lifestyle
+- Sticker Sheets
+These are available in Add/Edit Product, POS category filters and promotion category selection.

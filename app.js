@@ -14,7 +14,7 @@ const DEFAULT_BUNDLES=[
  {id:'bp-keychain',type:'bundle',categories:['Keychain'],qty:3,bundlePrice:15,active:true}
 ];
 const seed={products:[{id:'p1',sku:'BB-ST01',name:'Baobao Sticker',category:'Stickers',price:2.5,stock:100,low:5,image:''},{id:'p2',sku:'SN-ST01',name:'Sunny Sticker',category:'Stickers',price:2.5,stock:80,low:5,image:''}],promos:[],bundlePromos:DEFAULT_BUNDLES,sales:[],movements:[],cart:[],events:[],currentEventId:''};
-let db=load(),pendingProductImage='',editSaleDraft=[],selectedSaleIds=new Set(),sb=null,cloudSession=null,cloudSyncTimer=null,cloudProductSnapshot=new Map(),cloudEventSyncTimer=null,cloudSaleSyncTimer=null,cloudWorkspacePoller=null,cloudRealtimeChannel=null,cloudRealtimeTimer=null,cloudRealtimeInventoryTimer=null,cloudFocusRefreshBusy=false;
+let db=load(),pendingProductImage='',editSaleDraft=[],selectedSaleIds=new Set(),sb=null,cloudSession=null,cloudSyncTimer=null,cloudProductSnapshot=new Map(),cloudEventSyncTimer=null,cloudSaleSyncTimer=null,cloudWorkspacePoller=null,cloudRealtimeChannel=null,cloudRealtimeTimer=null,cloudRealtimeInventoryTimer=null,cloudRealtimeProductTimer=null,cloudFocusRefreshBusy=false;
 function load(){try{const raw=JSON.parse(localStorage.getItem(KEY)||'{}'),d={...structuredClone(seed),...raw};d.products=(d.products||[]).map(p=>({...p,image:p.image||'',category:p.category||'',stock:+p.stock||0}));d.promos=(d.promos||[]).map(p=>({...p,type:'gift'}));d.bundlePromos=Array.isArray(raw.bundlePromos)?raw.bundlePromos:structuredClone(DEFAULT_BUNDLES);d.sales=(d.sales||[]).map(s=>({...s,status:s.status||'active',subtotal:s.subtotal??s.total,bundleDiscount:s.bundleDiscount||0,bundlePromos:s.bundlePromos||[],eventId:s.eventId||'',eventName:s.eventName||''}));d.movements=d.movements||[];d.cart=d.cart||[];d.events=(d.events||[]).map(e=>{const x={...e,status:e.status||'open',stock:e.stock||{},opening:e.opening||{},added:e.added||{},returned:e.returned||{},activeProducts:e.activeProducts||{},createdAt:e.createdAt||new Date().toISOString()};if(!Object.keys(x.activeProducts).length){for(const id of new Set([...Object.keys(x.stock),...Object.keys(x.opening),...Object.keys(x.added)]))x.activeProducts[id]=true}return x});d.currentEventId=d.currentEventId||'';return d}catch{return structuredClone(seed)}}
 function persistLocal(){try{localStorage.setItem(KEY,JSON.stringify(db))}catch(e){toast('Storage is full. Export a backup and use smaller images.');throw e}}function save(){persistLocal();try{captureChangedProducts()}catch(e){console.warn('Cloud product change capture skipped',e)}try{scheduleCloudEventSync()}catch(e){console.warn('Cloud event sync schedule skipped',e)}try{scheduleCloudSaleSync()}catch(e){console.warn('Cloud sale sync schedule skipped',e)}}
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];const money=n=>new Intl.NumberFormat('en-SG',{style:'currency',currency:'SGD'}).format(Number(n)||0);const nowISO=()=>new Date().toISOString();const uid=p=>p+Date.now().toString(36)+Math.random().toString(36).slice(2,7);function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200)}function prod(id){return db.products.find(p=>p.id===id)}function eventById(id){return db.events.find(e=>e.id===id)}function currentEvent(){const e=eventById(db.currentEventId);return e&&e.status==='open'?e:null}function activeSale(s){return(s.status||'active')!=='voided'}function manualCart(){return db.cart.filter(i=>!i.promo)}
@@ -1017,7 +1017,7 @@ async function syncCloudWorkspace(){
 }
 
 async function fetchCloudProducts(){if(!cloudSession||!sb)throw new Error('Sign in first');const {data,error}=await sb.from('products').select('id,sku,name,category,price,image_url,master_qty,low_stock_at,active,updated_at').order('name');if(error)throw error;return data||[]}
-async function pullCloudProducts(options={}){if(!cloudSession||!sb)return openCloudLogin();if(!navigator.onLine)return toast('Internet connection required to pull cloud products');let rows;try{rows=await fetchCloudProducts()}catch(e){console.error(e);toast('Could not load cloud products');return}if(!rows.length)return toast('Cloud product catalogue is empty');if(!options.auto&&!confirm(`Replace this device's local product catalogue with ${rows.length} cloud products?\n\nExisting product IDs are preserved where the SKU already exists. Events and sales are not changed.`))return;const oldBySku=new Map(db.products.map(p=>[String(p.sku).toLowerCase(),p]));db.products=rows.map(r=>{const old=oldBySku.get(String(r.sku).toLowerCase());return{id:old?.id||`cloud_${r.id}`,cloudId:r.id,sku:r.sku,name:r.name,category:r.category||'',price:Number(r.price)||0,stock:Number(r.master_qty)||0,low:Number(r.low_stock_at)||0,image:r.image_url||'',active:r.active!==false}});db.cart=(db.cart||[]).filter(i=>db.products.some(p=>p.id===i.productId));persistLocal();resetProductCloudSnapshot();setPendingProductIds(new Set());renderCategoryOptions();renderAll();window.__cloudProductCount=rows.length;renderCloudPanel(`Downloaded ${rows.length} cloud products to this device.`);setCloudStatus('Cloud: synced','on');toast(`${rows.length} cloud products loaded`)}
+async function pullCloudProducts(options={}){if(!cloudSession||!sb){if(options.silent)return false;return openCloudLogin()}if(!navigator.onLine){if(options.silent)return false;return toast('Internet connection required to pull cloud products')}let rows;try{rows=await fetchCloudProducts()}catch(e){console.error(e);if(!options.silent)toast('Could not load cloud products');return false}if(!rows.length){if(!options.silent)toast('Cloud product catalogue is empty');return false}if(!options.auto&&!confirm(`Replace this device's local product catalogue with ${rows.length} cloud products?\n\nExisting product IDs are preserved where the SKU already exists. Events and sales are not changed.`))return;const oldBySku=new Map(db.products.map(p=>[String(p.sku).toLowerCase(),p]));db.products=rows.map(r=>{const old=oldBySku.get(String(r.sku).toLowerCase());return{id:old?.id||`cloud_${r.id}`,cloudId:r.id,sku:r.sku,name:r.name,category:r.category||'',price:Number(r.price)||0,stock:Number(r.master_qty)||0,low:Number(r.low_stock_at)||0,image:r.image_url||'',active:r.active!==false}});db.cart=(db.cart||[]).filter(i=>db.products.some(p=>p.id===i.productId));persistLocal();resetProductCloudSnapshot();setPendingProductIds(new Set());renderCategoryOptions();renderAll();window.__cloudProductCount=rows.length;renderCloudPanel(`Downloaded ${rows.length} cloud products to this device.`);setCloudStatus('Cloud: synced','on');if(!options.silent)toast(`${rows.length} cloud products loaded`);return true}
 async function maybeAutoPullCloudProducts(){if(!cloudSession||!sb||!navigator.onLine)return;try{const rows=await fetchCloudProducts();window.__cloudProductCount=rows.length;renderCloudPanel();const looksFresh=db.products.length<=2&&db.sales.length===0&&db.events.length===0;if(rows.length&&looksFresh)await pullCloudProducts({auto:true})}catch(e){console.warn('Auto pull skipped',e)}}
 function openCloudLogin(){const d=$('#cloudLoginDialog');if(!d)return;if(cloudSession)return toast('Already signed in');$('#cloudLoginError').textContent='';if(!d.open)d.showModal()}
 async function cloudLoginSubmit(e){if(e){e.preventDefault();e.stopPropagation()}if(!sb){$('#cloudLoginError').textContent=`Cloud library is not ready. ${window.__supabaseLoadError||'Tap Retry Cloud Library.'}`;const b=$('#cloudRetryLibraryBtn');if(b)b.style.display='block';return false}const form=$('#cloudLoginForm'),submit=form?.querySelector('button[type=submit]'),email=$('#cloudEmail').value.trim(),password=$('#cloudPassword').value;if(submit)submit.disabled=true;$('#cloudLoginError').textContent='Signing in…';try{const {data,error}=await sb.auth.signInWithPassword({email,password});if(error){$('#cloudLoginError').textContent=error.message;return false}cloudSession=data.session;$('#cloudPassword').value='';$('#cloudLoginError').textContent='';if($('#cloudLoginDialog').open)$('#cloudLoginDialog').close();setCloudStatus('Cloud: synced','on');renderCloudPanel('Signed in successfully. Starting live multi-device sync…');await syncCloudWorkspace();startCloudWorkspacePoller();startCloudRealtime();toast('Cloud signed in · live sync ready');return false}catch(err){console.error(err);$('#cloudLoginError').textContent='Could not sign in. Please try again.';return false}finally{if(submit)submit.disabled=false}}
@@ -1027,8 +1027,10 @@ async function cloudSignOut(){stopCloudRealtime();if(sb)await sb.auth.signOut();
 function stopCloudRealtime(){
   clearTimeout(cloudRealtimeTimer);
   clearTimeout(cloudRealtimeInventoryTimer);
+  clearTimeout(cloudRealtimeProductTimer);
   cloudRealtimeTimer=null;
   cloudRealtimeInventoryTimer=null;
+  cloudRealtimeProductTimer=null;
   if(cloudRealtimeChannel&&sb){
     try{sb.removeChannel(cloudRealtimeChannel)}catch(e){console.warn('Realtime channel cleanup skipped',e)}
   }
@@ -1051,6 +1053,49 @@ function scheduleRealtimeSalesRefresh(reason='sale'){
       console.warn('Realtime sales refresh skipped',e);
     }
   },450);
+}
+
+function scheduleRealtimeProductRefresh(reason='product'){
+  clearTimeout(cloudRealtimeProductTimer);
+  cloudRealtimeProductTimer=setTimeout(async()=>{
+    if(!cloudSession||!sb||!navigator.onLine)return;
+    try{
+      const rows=await fetchCloudProducts();
+      if(!rows.length)return;
+
+      const oldBySku=new Map(db.products.map(p=>[String(p.sku).toLowerCase(),p]));
+      db.products=rows.map(r=>{
+        const old=oldBySku.get(String(r.sku).toLowerCase());
+        return{
+          id:old?.id||`cloud_${r.id}`,
+          cloudId:r.id,
+          sku:r.sku,
+          name:r.name,
+          category:r.category||'',
+          price:Number(r.price)||0,
+          stock:Number(r.master_qty)||0,
+          low:Number(r.low_stock_at)||0,
+          image:r.image_url||'',
+          active:r.active!==false
+        };
+      });
+
+      db.cart=(db.cart||[]).filter(i=>db.products.some(p=>p.id===i.productId));
+      persistLocal();
+      resetProductCloudSnapshot();
+      setPendingProductIds(new Set());
+      window.__cloudProductCount=rows.length;
+      renderCategoryOptions();
+      renderAll();
+
+      setCloudStatus('Cloud: live','on');
+      renderCloudPanel(`Live product update received: ${reason}. Master Stock and catalogue refreshed.`);
+    }catch(e){
+      console.warn('Realtime product refresh skipped',e);
+      setCloudStatus('Cloud: product refresh issue','warn');
+      renderCloudPanel(`Product refresh failed: ${formatCloudError(e)}`);
+    }
+  },350);
 }
 
 function scheduleRealtimeInventoryRefresh(reason='stock'){
@@ -1084,6 +1129,9 @@ function startCloudRealtime(){
     .on('postgres_changes',{event:'*',schema:'public',table:'event_inventory'},payload=>{
       scheduleRealtimeInventoryRefresh(`event stock ${String(payload.eventType||'change').toLowerCase()}`);
     })
+    .on('postgres_changes',{event:'*',schema:'public',table:'products'},payload=>{
+      scheduleRealtimeProductRefresh(`products ${String(payload.eventType||'change').toLowerCase()}`);
+    })
     .subscribe(status=>{
       if(status==='SUBSCRIBED'){
         setCloudStatus('Cloud: live','on');
@@ -1105,6 +1153,7 @@ async function refreshCloudAfterFocus(){
     await syncPendingVoids(false);
     await syncPendingSales(false);
     await pullCloudSales({showToast:false});
+    await pullCloudProducts({auto:true,silent:true});
     await refreshCurrentEventInventoryFromCloud();
     renderAll();
     if(!cloudRealtimeChannel)startCloudRealtime();
@@ -1123,6 +1172,7 @@ function startCloudWorkspacePoller(){
       await syncPendingDeletes(false);
       await syncPendingVoids(false);
       await syncPendingSales(false);
+      await pullCloudProducts({auto:true,silent:true});
       await refreshCurrentEventInventoryFromCloud();
       await pullCloudSales({showToast:false});
     }catch(e){console.warn('Background cloud refresh skipped',e)}

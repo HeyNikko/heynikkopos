@@ -382,3 +382,41 @@ V8.4.1 — CLOUD SALES IMPORT HOTFIX
 - Cloud Sync now surfaces the actual sales-pull error instead of failing silently in the browser console.
 - No Supabase SQL changes are required for V8.4.1.
 - Existing Supabase sales and sale_items are untouched.
+
+
+V8.4.2 — LIVE MASTER STOCK + PRODUCT CATALOGUE SYNC
+---------------------------------------------------
+Run SUPABASE_V8_4_2_SETUP.sql once before using this build.
+
+NEW LIVE PRODUCT FLOW
+---------------------
+PC Restock / Adjust
+→ products.master_qty updates in Supabase
+→ Supabase Realtime
+→ iPad/phone automatically refreshes the product catalogue and Master Stock.
+
+Realtime product refresh also covers:
+- Product name
+- SKU-backed catalogue updates
+- Category
+- Selling price
+- Low-stock threshold
+- Active status
+- Product image URL
+- New products
+- Removed/deactivated cloud products
+
+RELIABILITY
+-----------
+1. Products table is now subscribed through Supabase Realtime.
+2. The existing 15-second fallback poll now refreshes cloud products too.
+3. Returning to the app/tab immediately pulls cloud products.
+4. Background product pulls are silent so they do not create repeated toast notifications.
+5. Sales, voids, deletes and event inventory live sync from V8.4/V8.4.1 remain unchanged.
+
+IMPORTANT INVENTORY DISTINCTION
+-------------------------------
+- Master Stock = products.master_qty
+- Event Stock = event_inventory.current_qty
+Changing Master Stock does NOT automatically change stock already allocated to an active event.
+It only updates the unallocated Master Stock quantity on every device.

@@ -781,3 +781,45 @@ so older promotions remain compatible.
 
 Promotion cloud sync requires no schema change because promotions are already
 stored in the existing JSON payload.
+
+
+V8.6.5 — TWD PROMO ELIGIBILITY + CHECKBOX UI FIX
+-------------------------------------------------
+No Supabase SQL changes are required.
+
+TWD PROMO RULE
+--------------
+Promotions no longer use FX fallback in Taiwan events.
+
+SGD event:
+- Active SGD bundle promo applies normally.
+
+TWD event:
+- TWD Bundle Price set -> promo applies.
+- TWD Bundle Price blank / 0 -> promo does NOT apply.
+- SGD promo is NOT auto-converted.
+
+Example:
+Product = NT$180
+SGD promo = 3 for S$15
+TWD promo = blank
+
+Taiwan POS:
+3 × NT$180 = NT$540
+No promo is applied.
+
+If TWD promo is set to NT$450:
+3 × NT$180 = NT$540
+Promo total = NT$450
+Discount = NT$90.
+
+PROMO CHECKBOX UI
+-----------------
+Eligible category checkboxes are now displayed as clear rows:
+[checkbox] Stickers
+[checkbox] Sticker Sheets
+[checkbox] Keychain
+[checkbox] Postcard
+[checkbox] Lifestyle
+
+The checkbox is directly beside its category label to avoid ambiguity.

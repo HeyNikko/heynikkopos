@@ -867,3 +867,58 @@ PRODUCT PRICE SYNC
 Saving an edited product now immediately pushes the pending product update to cloud
 when online, then refreshes product data back into POS. This helps a new TWD price
 such as NT$150 appear in the active Taiwan POS without waiting for the background cycle.
+
+
+V8.6.7 — EDIT EVENT
+-------------------
+No Supabase SQL changes are required.
+
+Open events now include an Edit Event button.
+
+You can change:
+- Event name
+- Start date
+- End date
+- Currency
+- Fallback exchange rate
+- Price rounding
+
+Editing an event does NOT change:
+- Master Stock
+- Event Stock
+- Opening quantities
+- Added / returned quantities
+- Existing sales
+- Event history
+
+Changes sync through the existing Pending Events cloud system and update the other device.
+Closed events remain view-only.
+
+
+V8.6.8 — DELETE CLOSED EVENT INVENTORY REVERSAL
+------------------------------------------------
+Run SUPABASE_V8_6_8_SETUP.sql once before using Delete on a closed event.
+
+V8.6.7 Edit Event is included.
+
+NEW DELETE SEMANTICS
+--------------------
+Close Event:
+- returns UNSOLD event stock to Master Stock
+- keeps completed sales deducted
+- preserves sales/event history
+
+Delete Closed Event:
+- treats deletion as a full reversal of that event history
+- restores quantities from COMPLETED / non-voided sales to Master Stock
+- does not restore voided sales again
+- deletes sale_items
+- deletes sales
+- deletes event_inventory
+- deletes the event
+
+The sold-stock restoration and cloud deletion happen in one Supabase transaction.
+If the transaction fails, none of those database changes are committed.
+
+For inventory safety, deleting a closed event now requires an internet/cloud connection.
+After deletion, the app immediately pulls Master Stock from cloud so the restored units are visible.

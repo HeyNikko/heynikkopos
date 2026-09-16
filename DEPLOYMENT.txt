@@ -1,0 +1,5 @@
+HeyNikko POS V8.6.8 Clean Deployment
+
+Upload the contents of this ZIP to the GitHub Pages repo root.
+Run SUPABASE_V8_6_8_SETUP.sql separately in Supabase SQL Editor once before using closed-event Delete.
+Old migration SQL files are intentionally excluded from this deployment package.

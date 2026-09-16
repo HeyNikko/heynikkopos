@@ -16,7 +16,7 @@ const DEFAULT_BUNDLES=[
  {id:'bp-keychain',type:'bundle',categories:['Keychain'],qty:3,bundlePrice:15,active:true}
 ];
 const seed={products:[{id:'p1',sku:'BB-ST01',name:'Baobao Sticker',category:'Stickers',price:2.5,stock:100,low:5,image:''},{id:'p2',sku:'SN-ST01',name:'Sunny Sticker',category:'Stickers',price:2.5,stock:80,low:5,image:''}],promos:[],bundlePromos:DEFAULT_BUNDLES,sales:[],movements:[],cart:[],events:[],currentEventId:''};
-let db=load(),pendingProductImage='',editSaleDraft=[],selectedSaleIds=new Set(),sb=null,cloudSession=null,cloudSyncTimer=null,cloudProductSnapshot=new Map(),cloudEventSyncTimer=null,cloudSaleSyncTimer=null,cloudWorkspacePoller=null,cloudRealtimeChannel=null,cloudRealtimeTimer=null,cloudRealtimeInventoryTimer=null,cloudRealtimeProductTimer=null,cloudFocusRefreshBusy=false,posCategoryState=localStorage.getItem('heynikko_pos_category')||'',cloudProductPushInFlight=false,cloudEventSnapshot=new Map(),cloudRealtimeEventTimer=null,salesDateFrom=localStorage.getItem('heynikko_sales_date_from')||'',salesDateTo=localStorage.getItem('heynikko_sales_date_to')||'';
+let db=load(),pendingProductImage='',editSaleDraft=[],selectedSaleIds=new Set(),sb=null,cloudSession=null,cloudSyncTimer=null,cloudProductSnapshot=new Map(),cloudEventSyncTimer=null,cloudSaleSyncTimer=null,cloudWorkspacePoller=null,cloudRealtimeChannel=null,cloudRealtimeTimer=null,cloudRealtimeInventoryTimer=null,cloudRealtimeProductTimer=null,cloudFocusRefreshBusy=false,posCategoryState=localStorage.getItem('heynikko_pos_category')||'',cloudProductPushInFlight=false,cloudEventSnapshot=new Map(),cloudRealtimeEventTimer=null,salesDateFrom=localStorage.getItem('heynikko_sales_date_from')||'',salesDateTo=localStorage.getItem('heynikko_sales_date_to')||'',editingEventId='';
 function load(){try{const raw=JSON.parse(localStorage.getItem(KEY)||'{}'),d={...structuredClone(seed),...raw};d.products=(d.products||[]).map(p=>({...p,image:p.image||'',category:p.category||'',stock:+p.stock||0}));d.promos=(d.promos||[]).map(p=>({...p,type:'gift'}));d.bundlePromos=Array.isArray(raw.bundlePromos)?raw.bundlePromos:structuredClone(DEFAULT_BUNDLES);d.sales=(d.sales||[]).map(s=>({...s,status:s.status||'active',subtotal:s.subtotal??s.total,bundleDiscount:s.bundleDiscount||0,bundlePromos:s.bundlePromos||[],eventId:s.eventId||'',eventName:s.eventName||'',currencyCode:s.currencyCode||'SGD',exchangeRate:Number(s.exchangeRate)||1}));d.movements=d.movements||[];d.cart=d.cart||[];d.events=(d.events||[]).map(e=>{const x={...e,status:e.status||'open',stock:e.stock||{},opening:e.opening||{},added:e.added||{},returned:e.returned||{},activeProducts:e.activeProducts||{},createdAt:e.createdAt||new Date().toISOString(),currencyCode:e.currencyCode||'SGD',exchangeRate:Number(e.exchangeRate)||1,priceRounding:Number(e.priceRounding)||0};if(!Object.keys(x.activeProducts).length){for(const id of new Set([...Object.keys(x.stock),...Object.keys(x.opening),...Object.keys(x.added)]))x.activeProducts[id]=true}return x});d.currentEventId=d.currentEventId||'';return d}catch{return structuredClone(seed)}}
 function persistLocal(){try{localStorage.setItem(KEY,JSON.stringify(db))}catch(e){toast('Storage is full. Export a backup and use smaller images.');throw e}}function save(){persistLocal();try{captureChangedProducts()}catch(e){console.warn('Cloud product change capture skipped',e)}try{captureChangedEvents();scheduleCloudEventSync()}catch(e){console.warn('Cloud event change capture skipped',e)}try{scheduleCloudSaleSync()}catch(e){console.warn('Cloud sale sync schedule skipped',e)}}
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];const money=n=>new Intl.NumberFormat('en-SG',{style:'currency',currency:'SGD'}).format(Number(n)||0);
@@ -220,8 +220,8 @@ function eventSoldQty(e,pid){return eventSales(e).reduce((n,s)=>n+s.items.filter
 function eventActiveIds(e){return db.products.filter(p=>e.activeProducts?.[p.id]).map(p=>p.id)}
 function renderEvents(){const cur=currentEvent();$('#currentEventPanel').innerHTML=cur?renderCurrentEvent(cur):'<div class="empty-event"><strong>No open event selected.</strong><span>Create an event to allocate booth inventory.</span></div>';$('#eventsTable').innerHTML=db.events.filter(e=>!e.deletedPending).slice().sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt)).map(e=>`<tr><td><strong>${esc(e.name)}</strong></td><td>${fmtDate(e.start)}${e.end&&e.end!==e.start?' – '+fmtDate(e.end):''}</td><td><span class="status-pill ${e.status==='closed'?'voided':'active'}">${e.status==='closed'?'CLOSED':'OPEN'}</span></td><td>${eventMoney(eventRevenue(e),e)}</td><td>${eventUnitsSold(e)}</td><td><div class="action-row">${e.status==='open'?`<button class="ghost" data-use-event="${e.id}">${db.currentEventId===e.id?'Using':'Use POS'}</button><button class="danger-btn" data-close-event="${e.id}">Close</button>`:`<button class="ghost" data-view-event="${e.id}">View</button><button class="danger-btn" data-delete-event="${e.id}">Delete</button>`}</div></td></tr>`).join('')||'<tr><td colspan="6" class="muted">No events yet.</td></tr>';
 $$('[data-use-event]').forEach(b=>b.onclick=()=>{db.currentEventId=b.dataset.useEvent;db.cart=[];save();renderAll();switchView('pos');toast('Event selected')});$$('[data-close-event]').forEach(b=>b.onclick=()=>closeEvent(b.dataset.closeEvent));$$('[data-view-event]').forEach(b=>b.onclick=()=>viewClosedEvent(b.dataset.viewEvent));
-const s=$('#eventProductSearch');if(s)s.oninput=e=>{eventListSearch=e.target.value;renderEvents()};const c=$('#eventProductCategory');if(c)c.onchange=e=>{eventListCategory=e.target.value;renderEvents()};const m=$('[data-manage-event]');if(m)m.onclick=()=>openManageEvent(m.dataset.manageEvent);$$('[data-event-stock]').forEach(b=>b.onclick=()=>openEventStock(cur?.id,b.dataset.eventStock))}
-function renderCurrentEvent(e){const cats=[...new Set([...CATEGORIES,...db.products.map(p=>p.category).filter(Boolean)])];const q=eventListSearch.toLowerCase(),cat=eventListCategory;const list=db.products.filter(p=>e.activeProducts?.[p.id]&&(!cat||p.category===cat)&&(p.name+' '+p.sku).toLowerCase().includes(q));const rows=list.map(p=>{const current=e.stock[p.id]||0,opening=e.opening[p.id]||0,added=e.added[p.id]||0,sold=eventSoldQty(e,p.id);return`<tr><td>${productImageHtml(p,'table-thumb')}</td><td>${esc(p.name)}<div class="muted">${esc(p.sku)}</div></td><td>${p.stock}</td><td>${opening}</td><td>${added}</td><td>${sold}</td><td><strong>${current}</strong></td><td><button class="ghost" data-event-stock="${p.id}">+ Add Event Stock</button></td></tr>`}).join('');return`<div class="current-event-card"><div class="event-head"><div><span class="eyebrow">CURRENT EVENT</span><h3>${esc(e.name)}</h3><p>${fmtDate(e.start)}${e.end&&e.end!==e.start?' – '+fmtDate(e.end):''} · ${eventMoney(eventRevenue(e),e)} sales · ${eventUnitsSold(e)} units sold · ${eventActiveIds(e).length} active products · ${eventCurrency(e)}</p></div><div class="action-row"><button class="primary" data-manage-event="${e.id}">Manage Products & Stock</button><button class="ghost" data-open-pos>Open POS</button><button class="danger-btn" data-close-current>Close Event</button></div></div><div class="event-list-tools"><input id="eventProductSearch" value="${esc(eventListSearch)}" placeholder="Search active event products…"><select id="eventProductCategory"><option value="">All categories</option>${cats.map(x=>`<option value="${esc(x)}" ${x===cat?'selected':''}>${esc(x)}</option>`).join('')}</select></div><div class="table-wrap"><table><thead><tr><th>Image</th><th>Product</th><th>Master</th><th>Initial</th><th>Added</th><th>Sold</th><th>Event Left</th><th>Action</th></tr></thead><tbody>${rows||'<tr><td colspan="8" class="muted">No matching products.</td></tr>'}</tbody></table></div></div>`}
+const s=$('#eventProductSearch');if(s)s.oninput=e=>{eventListSearch=e.target.value;renderEvents()};const c=$('#eventProductCategory');if(c)c.onchange=e=>{eventListCategory=e.target.value;renderEvents()};const m=$$('[data-edit-event]').forEach(b=>b.onclick=()=>openEditEvent(b.dataset.editEvent));$('[data-manage-event]');if(m)m.onclick=()=>openManageEvent(m.dataset.manageEvent);$$('[data-event-stock]').forEach(b=>b.onclick=()=>openEventStock(cur?.id,b.dataset.eventStock))}
+function renderCurrentEvent(e){const cats=[...new Set([...CATEGORIES,...db.products.map(p=>p.category).filter(Boolean)])];const q=eventListSearch.toLowerCase(),cat=eventListCategory;const list=db.products.filter(p=>e.activeProducts?.[p.id]&&(!cat||p.category===cat)&&(p.name+' '+p.sku).toLowerCase().includes(q));const rows=list.map(p=>{const current=e.stock[p.id]||0,opening=e.opening[p.id]||0,added=e.added[p.id]||0,sold=eventSoldQty(e,p.id);return`<tr><td>${productImageHtml(p,'table-thumb')}</td><td>${esc(p.name)}<div class="muted">${esc(p.sku)}</div></td><td>${p.stock}</td><td>${opening}</td><td>${added}</td><td>${sold}</td><td><strong>${current}</strong></td><td><button class="ghost" data-event-stock="${p.id}">+ Add Event Stock</button></td></tr>`}).join('');return`<div class="current-event-card"><div class="event-head"><div><span class="eyebrow">CURRENT EVENT</span><h3>${esc(e.name)}</h3><p>${fmtDate(e.start)}${e.end&&e.end!==e.start?' – '+fmtDate(e.end):''} · ${eventMoney(eventRevenue(e),e)} sales · ${eventUnitsSold(e)} units sold · ${eventActiveIds(e).length} active products · ${eventCurrency(e)}</p></div><div class="action-row"><button class="ghost" data-edit-event="${e.id}">Edit Event</button><button class="primary" data-manage-event="${e.id}">Manage Products & Stock</button><button class="ghost" data-open-pos>Open POS</button><button class="danger-btn" data-close-current>Close Event</button></div></div><div class="event-list-tools"><input id="eventProductSearch" value="${esc(eventListSearch)}" placeholder="Search active event products…"><select id="eventProductCategory"><option value="">All categories</option>${cats.map(x=>`<option value="${esc(x)}" ${x===cat?'selected':''}>${esc(x)}</option>`).join('')}</select></div><div class="table-wrap"><table><thead><tr><th>Image</th><th>Product</th><th>Master</th><th>Initial</th><th>Added</th><th>Sold</th><th>Event Left</th><th>Action</th></tr></thead><tbody>${rows||'<tr><td colspan="8" class="muted">No matching products.</td></tr>'}</tbody></table></div></div>`}
 function visibleEventDraftProducts(){
   const q=(eventDraft.search||'').toLowerCase(),cat=eventDraft.category||'';
   return db.products.filter(p=>(!cat||p.category===cat)&&(p.name+' '+p.sku).toLowerCase().includes(q));
@@ -239,13 +239,80 @@ function useMasterQtyForCreateEvent(){
   toast(`Master quantities applied · ${selected.length} product${selected.length===1?'':'s'} · ${total} units`);
 }
 function renderEventDraft(){const cats=[...new Set([...CATEGORIES,...db.products.map(p=>p.category).filter(Boolean)])];$('#eventSetupCategory').innerHTML='<option value="">All categories</option>'+cats.map(c=>`<option value="${esc(c)}" ${c===eventDraft.category?'selected':''}>${esc(c)}</option>`).join('');const q=eventDraft.search.toLowerCase(),cat=eventDraft.category;const list=visibleEventDraftProducts();$('#eventAllocationList').innerHTML=list.map(p=>`<div class="bulk-row"><input type="checkbox" data-event-pick="${p.id}" ${eventDraft.selected[p.id]?'checked':''}><div>${productImageHtml(p,'allocation-thumb')}<span><strong>${esc(p.name)}</strong><small>${esc(p.sku)} · ${esc(p.category||'Uncategorised')} · Master ${p.stock}</small></span></div><input type="number" min="0" step="1" value="${eventDraft.qty[p.id]||0}" data-event-qty="${p.id}" ${eventDraft.selected[p.id]?'':'disabled'}></div>`).join('')||'<p class="muted bulk-empty">No products found.</p>';$$('[data-event-pick]').forEach(x=>x.onchange=()=>{eventDraft.selected[x.dataset.eventPick]=x.checked;const inp=$(`[data-event-qty="${x.dataset.eventPick}"]`);if(inp)inp.disabled=!x.checked});$$('[data-event-qty]').forEach(x=>x.oninput=()=>eventDraft.qty[x.dataset.eventQty]=Math.max(0,+x.value||0))}
-function openCreateEvent(){if(!db.products.length)return toast('Add products first');const today=new Date().toISOString().slice(0,10);eventDraft={selected:{},qty:{},search:'',category:'',currencyCode:'SGD',exchangeRate:1,priceRounding:0};$('#eventName').value='';$('#eventStart').value=today;$('#eventEnd').value=today;$('#eventSetupSearch').value='';const prev=$('#copyEventSelect');prev.innerHTML='<option value="">Choose a previous event…</option>'+db.events.slice().sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt)).map(e=>`<option value="${e.id}">${esc(e.name)}</option>`).join('');renderEventDraft();$('#eventCurrency').value='SGD';$('#eventExchangeRate').value='1';$('#eventPriceRounding').value='0';updateEventCurrencyUI();$('#eventDialog').showModal()}
+function openCreateEvent(){editingEventId='';if(!db.products.length)return toast('Add products first');const today=new Date().toISOString().slice(0,10);eventDraft={selected:{},qty:{},search:'',category:'',currencyCode:'SGD',exchangeRate:1,priceRounding:0};$('#eventName').value='';$('#eventStart').value=today;$('#eventEnd').value=today;$('#eventSetupSearch').value='';const prev=$('#copyEventSelect');prev.innerHTML='<option value="">Choose a previous event…</option>'+db.events.slice().sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt)).map(e=>`<option value="${e.id}">${esc(e.name)}</option>`).join('');renderEventDraft();$('#eventCurrency').value='SGD';$('#eventExchangeRate').value='1';$('#eventPriceRounding').value='0';updateEventCurrencyUI();$('#eventDialogTitle').textContent='Create Event';$('#eventSaveBtn').textContent='Create Event';$('#eventDialog').showModal()}
 function visibleDraftProducts(){const q=eventDraft.search.toLowerCase(),cat=eventDraft.category;return db.products.filter(p=>(!cat||p.category===cat)&&(p.name+' '+p.sku).toLowerCase().includes(q))}
 function setDraftVisible(on){for(const p of visibleDraftProducts())eventDraft.selected[p.id]=on;renderEventDraft()}
 function copyPreviousEvent(){const src=eventById($('#copyEventSelect').value);if(!src)return toast('Choose an event to copy');const withQty=$('#copyEventQty').checked;eventDraft.selected={};eventDraft.qty={};for(const p of db.products){const had=src.activeProducts?.[p.id]||(src.opening[p.id]||0)||(src.added[p.id]||0);if(had){eventDraft.selected[p.id]=true;if(withQty)eventDraft.qty[p.id]=Math.min(p.stock,src.opening[p.id]||0)}}renderEventDraft();toast(withQty?'Products and starting quantities copied':'Product selection copied')}
 async function importEventCsv(file,mode){if(!file)return;const text=await file.text(),lines=text.replace(/\r/g,'').split('\n').filter(Boolean);let count=0;for(let i=0;i<lines.length;i++){const cols=lines[i].split(',').map(s=>s.trim().replace(/^"|"$/g,''));if(i===0&&/sku/i.test(cols[0]))continue;const sku=cols[0],qty=Math.max(0,parseInt(cols[1]||'0',10)||0),p=db.products.find(x=>x.sku.toLowerCase()===sku.toLowerCase());if(!p)continue;if(mode==='create'){eventDraft.selected[p.id]=true;eventDraft.qty[p.id]=qty}else{manageDraft.active[p.id]=true;manageDraft.target[p.id]=qty}count++}mode==='create'?renderEventDraft():renderManageDraft();toast(`${count} CSV rows matched by SKU`)}
 function updateEventCurrencyUI(){const code=$('#eventCurrency')?.value||'SGD',raw=$('#eventExchangeRate')?.value||'',rate=Number(raw),rounding=Number($('#eventPriceRounding')?.value)||0;const l=$('#eventCurrencyRateLabel');if(l)l.textContent=code;const preview=$('#eventCurrencyPreview');if(preview){if(code!=='SGD'&&(!raw||!Number.isFinite(rate)||rate<=0)){preview.textContent=`Enter the selling exchange rate for ${code} before creating this event.`;return}const validRate=code==='SGD'?1:rate,example=roundEventPrice(10*validRate,{priceRounding:rounding});preview.textContent=code==='SGD'?`Singapore pricing: S$10.00 → ${moneyCurrency(example,code)}`:`Example only: S$10.00 → ${moneyCurrency(example,code)} at 1 SGD = ${validRate} ${code}.`}}
-function saveEventForm(e){e.preventDefault();const name=$('#eventName').value.trim();if(!name)return toast('Enter an event name');const ev={id:uid('E'),name,start:$('#eventStart').value,end:$('#eventEnd').value,status:'open',createdAt:nowISO(),closedAt:'',currencyCode:$('#eventCurrency').value||'SGD',exchangeRate:Math.max(.0001,Number($('#eventExchangeRate').value)||1),priceRounding:Number($('#eventPriceRounding').value)||0,stock:{},opening:{},added:{},returned:{},activeProducts:{}};for(const p of db.products){if(!eventDraft.selected[p.id])continue;const q=Math.max(0,+eventDraft.qty[p.id]||0);if(q>p.stock)return toast(`${p.name}: only ${p.stock} in Master Stock`);ev.activeProducts[p.id]=true;ev.stock[p.id]=q;ev.opening[p.id]=q;if(q){p.stock-=q;db.movements.push({id:uid('m'),createdAt:nowISO(),productId:p.id,sku:p.sku,name:p.name,delta:-q,scope:'master',eventId:ev.id,eventName:ev.name,reason:'Allocated to event',receipt:''});db.movements.push({id:uid('m'),createdAt:nowISO(),productId:p.id,sku:p.sku,name:p.name,delta:q,scope:'event',eventId:ev.id,eventName:ev.name,reason:'Initial event allocation',receipt:''})}}db.events.push(ev);db.currentEventId=ev.id;db.cart=[];save();$('#eventDialog').close();renderAll();switchView('events');toast(`Event created with ${eventActiveIds(ev).length} products`)}
+function openEditEvent(id){
+  const ev=eventById(id);
+  if(!ev||ev.status!=='open')return toast('Only open events can be edited');
+
+  editingEventId=ev.id;
+  $('#eventDialogTitle').textContent='Edit Event';
+  $('#eventSaveBtn').textContent='Save Changes';
+
+  $('#eventName').value=ev.name||'';
+  $('#eventStart').value=ev.start||'';
+  $('#eventEnd').value=ev.end||ev.start||'';
+  $('#eventCurrency').value=eventCurrency(ev);
+  $('#eventExchangeRate').value=eventExchangeRate(ev);
+  $('#eventPriceRounding').value=eventRounding(ev)||'none';
+  updateEventCurrencyUI();
+
+  eventDraft={
+    search:'',
+    category:'',
+    selected:{...(ev.activeProducts||{})},
+    qty:{...(ev.stock||{})},
+    currencyCode:eventCurrency(ev),
+    exchangeRate:eventExchangeRate(ev),
+    priceRounding:eventRounding(ev)
+  };
+
+  $('#eventSearch').value='';
+  $('#eventCategoryFilter').value='';
+  renderEventDraft();
+  $('#eventDialog').showModal();
+}
+function saveEventForm(e){e.preventDefault();
+  if(editingEventId){
+    const ev=eventById(editingEventId);
+    if(!ev||ev.status!=='open')return toast('This event can no longer be edited');
+
+    const name=$('#eventName').value.trim(),
+      start=$('#eventStart').value,
+      end=$('#eventEnd').value||start;
+
+    if(!name)return toast('Event name is required');
+    if(!start)return toast('Start date is required');
+    if(end&&end<start)return toast('End date cannot be before Start date');
+
+    ev.name=name;
+    ev.start=start;
+    ev.end=end;
+    ev.currencyCode=$('#eventCurrency').value||'SGD';
+    ev.exchangeRate=Math.max(0.0001,Number($('#eventExchangeRate').value)||1);
+    ev.priceRounding=$('#eventPriceRounding').value==='none'?0:Number($('#eventPriceRounding').value)||0;
+    ev.updatedAt=nowISO();
+
+    markEventPending(ev.id);
+    save();
+    $('#eventDialog').close();
+    editingEventId='';
+    renderAll();
+    toast('Event updated · syncing…');
+
+    if(cloudSession&&sb&&navigator.onLine){
+      syncPendingEvents(false)
+        .then(ok=>ok?pullCloudEvents({showToast:false}):false)
+        .then(()=>renderAll())
+        .catch(err=>console.warn('Event edit sync pending',err));
+    }
+    return;
+  }
+const name=$('#eventName').value.trim();if(!name)return toast('Enter an event name');const ev={id:uid('E'),name,start:$('#eventStart').value,end:$('#eventEnd').value,status:'open',createdAt:nowISO(),closedAt:'',currencyCode:$('#eventCurrency').value||'SGD',exchangeRate:Math.max(.0001,Number($('#eventExchangeRate').value)||1),priceRounding:Number($('#eventPriceRounding').value)||0,stock:{},opening:{},added:{},returned:{},activeProducts:{}};for(const p of db.products){if(!eventDraft.selected[p.id])continue;const q=Math.max(0,+eventDraft.qty[p.id]||0);if(q>p.stock)return toast(`${p.name}: only ${p.stock} in Master Stock`);ev.activeProducts[p.id]=true;ev.stock[p.id]=q;ev.opening[p.id]=q;if(q){p.stock-=q;db.movements.push({id:uid('m'),createdAt:nowISO(),productId:p.id,sku:p.sku,name:p.name,delta:-q,scope:'master',eventId:ev.id,eventName:ev.name,reason:'Allocated to event',receipt:''});db.movements.push({id:uid('m'),createdAt:nowISO(),productId:p.id,sku:p.sku,name:p.name,delta:q,scope:'event',eventId:ev.id,eventName:ev.name,reason:'Initial event allocation',receipt:''})}}db.events.push(ev);db.currentEventId=ev.id;db.cart=[];save();$('#eventDialog').close();renderAll();switchView('events');toast(`Event created with ${eventActiveIds(ev).length} products`)}
 function openManageEvent(id){const e=eventById(id);if(!e||e.status!=='open')return;manageDraft={eventId:id,active:{},target:{},search:'',category:''};for(const p of db.products){manageDraft.active[p.id]=!!e.activeProducts?.[p.id];manageDraft.target[p.id]=e.stock[p.id]||0}$('#manageEventName').textContent=e.name;$('#manageSearch').value='';renderManageDraft();$('#manageEventDialog').showModal()}
 function renderManageDraft(){const e=eventById(manageDraft.eventId),cats=[...new Set([...CATEGORIES,...db.products.map(p=>p.category).filter(Boolean)])];$('#manageCategory').innerHTML='<option value="">All categories</option>'+cats.map(c=>`<option value="${esc(c)}" ${c===manageDraft.category?'selected':''}>${esc(c)}</option>`).join('');const q=manageDraft.search.toLowerCase(),cat=manageDraft.category;const list=db.products.filter(p=>(!cat||p.category===cat)&&(p.name+' '+p.sku).toLowerCase().includes(q));$('#manageProductList').innerHTML=list.map(p=>{const sold=eventSoldQty(e,p.id);return`<div class="bulk-row manage-row"><input type="checkbox" data-manage-active="${p.id}" ${manageDraft.active[p.id]?'checked':''}><div>${productImageHtml(p,'allocation-thumb')}<span><strong>${esc(p.name)}</strong><small>${esc(p.sku)} · Master ${p.stock} · Sold ${sold}</small></span></div><input type="number" min="0" step="1" value="${manageDraft.target[p.id]||0}" data-manage-target="${p.id}" ${manageDraft.active[p.id]?'':'disabled'}></div>`}).join('');$$('[data-manage-active]').forEach(x=>x.onchange=()=>{manageDraft.active[x.dataset.manageActive]=x.checked;const inp=$(`[data-manage-target="${x.dataset.manageActive}"]`);if(inp)inp.disabled=!x.checked});$$('[data-manage-target]').forEach(x=>x.oninput=()=>manageDraft.target[x.dataset.manageTarget]=Math.max(0,+x.value||0))}
 
@@ -667,22 +734,26 @@ async function deletePastEvent(id){
   const e=eventById(id);
   if(!e||e.status!=='closed')return toast('Only closed events can be permanently deleted');
 
-  const sales=db.sales.filter(s=>s.eventId===e.id);
+  const sales=db.sales.filter(s=>s.eventId===e.id),
+    completedSales=sales.filter(activeSale),
+    soldUnits=completedSales.reduce((n,s)=>n+(s.items||[]).reduce((x,i)=>x+(Number(i.qty)||0),0),0);
 
   if(!confirm(
     `Delete ${e.name} permanently?\n\n`+
-    `This removes the closed event, its Event Inventory, and ${sales.length} sale record${sales.length===1?'':'s'} from this POS and Supabase.\n\n`+
-    `Master Stock will NOT change because inventory was already settled when the event was closed.\n\n`+
+    `This will reverse the closed event as though it no longer happened.\n\n`+
+    `${soldUnits} sold unit${soldUnits===1?'':'s'} from completed sales will be returned to Master Stock. `+
+    `Voided sales are excluded because their stock was already restored.\n\n`+
+    `The event, its Event Inventory, and ${sales.length} sale record${sales.length===1?'':'s'} will then be deleted from this POS and Supabase.\n\n`+
     `This cannot be undone.`
   ))return;
 
+  if(!cloudSession||!sb||!navigator.onLine){
+    return toast('Inventory safety: connect to the cloud before deleting a closed event.');
+  }
+
   e.deletedPending=true;
   e.deletedAt=nowISO();
-
-  for(const s of sales){
-    s.deletedPending=true;
-    s.deletedWithEvent=true;
-  }
+  for(const s of sales){s.deletedPending=true;s.deletedWithEvent=true}
 
   const pendingEvents=getPendingEventIds();
   pendingEvents.delete(e.id);
@@ -691,20 +762,20 @@ async function deletePastEvent(id){
   persistLocal();
   renderAll();
 
-  if(cloudSession&&sb&&navigator.onLine){
-    toast('Deleting event history from cloud…');
-    const ok=await syncPendingEventDeletes(false);
+  toast('Reversing event and restoring sold stock…');
+  const ok=await syncPendingEventDeletes(false);
 
-    if(ok){
-      await pullCloudEvents({showToast:false});
-      await pullCloudSales({showToast:false});
-      renderAll();
-      toast('Event and its sales history permanently deleted');
-    }else{
-      toast('Event hidden locally · cloud delete pending');
-    }
+  if(ok){
+    // The delete_pos_event RPC changes products.master_qty atomically.
+    // Pull products immediately so Master Stock reflects the restored sold units now.
+    await pullCloudProducts({auto:true,silent:true});
+    await pullCloudEvents({showToast:false});
+    await pullCloudSales({showToast:false});
+    renderAll();
+    const restored=Number(window.__lastEventDeleteRestoredUnits)||soldUnits;
+    toast(`Event deleted · ${restored} sold unit${restored===1?'':'s'} restored to Master Stock`);
   }else{
-    toast('Event hidden locally · cloud delete queued');
+    toast('Event delete pending · inventory has not been changed locally');
   }
 }
 
@@ -1326,7 +1397,7 @@ async function pushEventDeleteToCloud(e){
     return true;
   }
 
-  const {error}=await sb.rpc('delete_pos_event',{
+  const {data,error}=await sb.rpc('delete_pos_event',{
     p_event_id:e.cloudId,
     p_local_id:e.id
   });
@@ -1337,7 +1408,7 @@ async function pushEventDeleteToCloud(e){
   db.movements=db.movements.filter(m=>m.eventId!==e.id&&!receipts.has(m.receipt));
   db.events=db.events.filter(x=>x.id!==e.id);
   persistLocal();
-  return true;
+  return data||{deleted:true};
 }
 
 async function syncPendingEventDeletes(showToast=true){
@@ -1348,14 +1419,15 @@ async function syncPendingEventDeletes(showToast=true){
   if(!pending.size)return true;
 
   setCloudStatus('Cloud: deleting event','syncing');
-  let failed=[];
+  let failed=[],restoredUnits=0;
 
   for(const id of [...pending]){
     const e=db.events.find(x=>x.id===id);
     if(!e){pending.delete(id);continue}
 
     try{
-      await pushEventDeleteToCloud(e);
+      const result=await pushEventDeleteToCloud(e);
+      restoredUnits+=Number(result?.units_restored)||0;
       pending.delete(id);
       setPendingEventDeleteIds(pending);
     }catch(err){
@@ -1373,8 +1445,9 @@ async function syncPendingEventDeletes(showToast=true){
     return false;
   }
 
+  window.__lastEventDeleteRestoredUnits=restoredUnits;
   setCloudStatus('Cloud: synced','on');
-  if(showToast)toast('Event permanently deleted from cloud');
+  if(showToast)toast(restoredUnits?`Event deleted · ${restoredUnits} sold unit${restoredUnits===1?'':'s'} restored to Master Stock`:'Event permanently deleted from cloud');
   return true;
 }
 

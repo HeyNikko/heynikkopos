@@ -941,3 +941,32 @@ V8.6.9:
 - clicking outside the dialog closes it
 - Escape/native dialog cancel closes it
 - pointer handling is included for iPad Safari
+
+
+V8.7 — PRODUCT DIALOG CANCEL + CUSTOM CATEGORIES
+------------------------------------------------
+No Supabase SQL changes are required.
+
+ADD / EDIT PRODUCT CANCEL
+-------------------------
+- Cancel is now a non-submit button.
+- Save is the only submit action.
+- Cancel closes immediately without required-field validation.
+- Backdrop tap/click and Escape also close the Product dialog.
+
+CUSTOM CATEGORIES
+-----------------
+The Product form now includes "+ Add Category" beside the Category dropdown.
+
+Workflow:
+1. Master Stock > Add Product or Edit Product
+2. Click + Add Category
+3. Enter the category name
+4. The category is selected immediately
+5. Save the product
+
+Categories already used by synced products are automatically included in category
+filters/dropdowns on the other device after product sync.
+
+Default categories remain:
+Stickers, Sticker Sheets, Keychain, Postcard, Lifestyle.

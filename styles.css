@@ -288,3 +288,8 @@ select,select.ios-select{color:#332b22!important;-webkit-text-fill-color:#332b22
 #promoCategoryChecks .category-check{display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:flex-start!important;gap:10px!important;padding:8px 10px;border:1px solid #eadfcf;border-radius:10px;background:#fff;cursor:pointer;font-weight:700}
 #promoCategoryChecks .category-check input[type="checkbox"]{width:18px!important;height:18px!important;min-width:18px;flex:0 0 18px;margin:0!important}
 #promoCategoryChecks .category-check span{display:inline-block;line-height:1.2}
+
+.category-field-row{display:flex;gap:8px;align-items:center}
+.category-field-row select{flex:1;min-width:0}
+.compact-btn{white-space:nowrap;padding:10px 12px}
+@media(max-width:620px){.category-field-row{align-items:stretch;flex-direction:column}.compact-btn{width:100%}}

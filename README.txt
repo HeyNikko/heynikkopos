@@ -1031,3 +1031,24 @@ Cloud behavior:
 - edits enter the Pending Promos queue
 - the existing Supabase row is updated, not duplicated
 - V8.7.1 permanent deletion and V8.7.2 promo sync protection remain included
+
+
+V8.7.4 — PROMO CURRENCY VIEW
+----------------------------
+No Supabase SQL changes are required.
+
+Promotions can now be filtered by:
+- All
+- SGD
+- TWD
+
+The current Event currency is used as the initial view when no previous filter is saved.
+
+The table now separates Currency from Offer:
+Currency: SGD | Offer: 3 for S$15.00
+Currency: TWD | Offer: 3 for NT$400
+
+Promos configured in both currencies appear under both currency filters.
+Free Gift promos are marked Universal.
+
+Edit / Disable / Delete and the promo cloud sync protections remain unchanged.

@@ -295,10 +295,123 @@ function eventSales(e){return db.sales.filter(s=>s.eventId===e.id&&activeSale(s)
 let eventListSearch='',eventListCategory='';let eventDraft={selected:{},qty:{},search:'',category:''};let manageDraft={eventId:'',active:{},target:{},search:'',category:''};
 function eventSoldQty(e,pid){return eventSales(e).reduce((n,s)=>n+s.items.filter(i=>i.productId===pid).reduce((a,i)=>a+i.qty,0),0)}
 function eventActiveIds(e){return db.products.filter(p=>e.activeProducts?.[p.id]).map(p=>p.id)}
-function renderEvents(){const cur=currentEvent();$('#currentEventPanel').innerHTML=cur?renderCurrentEvent(cur):'<div class="empty-event"><strong>No open event selected.</strong><span>Create an event to allocate booth inventory.</span></div>';$('#eventsTable').innerHTML=db.events.filter(e=>!e.deletedPending).slice().sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt)).map(e=>`<tr><td><strong>${esc(e.name)}</strong></td><td>${fmtDate(e.start)}${e.end&&e.end!==e.start?' – '+fmtDate(e.end):''}</td><td><span class="status-pill ${e.status==='closed'?'voided':'active'}">${e.status==='closed'?'CLOSED':'OPEN'}</span></td><td>${eventMoney(eventRevenue(e),e)}</td><td>${eventUnitsSold(e)}</td><td><div class="action-row">${e.status==='open'?`<button class="ghost" data-use-event="${e.id}">${db.currentEventId===e.id?'Using':'Use POS'}</button><button class="danger-btn" data-close-event="${e.id}">Close</button>`:`<button class="ghost" data-view-event="${e.id}">View</button><button class="danger-btn" data-delete-event="${e.id}">Delete</button>`}</div></td></tr>`).join('')||'<tr><td colspan="6" class="muted">No events yet.</td></tr>';
-$$('[data-use-event]').forEach(b=>b.onclick=()=>{db.currentEventId=b.dataset.useEvent;db.cart=[];save();renderAll();switchView('pos');toast('Event selected')});$$('[data-close-event]').forEach(b=>b.onclick=()=>closeEvent(b.dataset.closeEvent));$$('[data-view-event]').forEach(b=>b.onclick=()=>viewClosedEvent(b.dataset.viewEvent));
-const s=$('#eventProductSearch');if(s)s.oninput=e=>{eventListSearch=e.target.value;renderEvents()};const c=$('#eventProductCategory');if(c)c.onchange=e=>{eventListCategory=e.target.value;renderEvents()};const m=$$('[data-edit-event]').forEach(b=>b.onclick=()=>openEditEvent(b.dataset.editEvent));$('[data-manage-event]');if(m)m.onclick=()=>openManageEvent(m.dataset.manageEvent);$$('[data-event-stock]').forEach(b=>b.onclick=()=>openEventStock(cur?.id,b.dataset.eventStock))}
-function renderCurrentEvent(e){const cats=[...new Set([...CATEGORIES,...db.products.map(p=>p.category).filter(Boolean)])];const q=eventListSearch.toLowerCase(),cat=eventListCategory;const list=db.products.filter(p=>e.activeProducts?.[p.id]&&(!cat||p.category===cat)&&(p.name+' '+p.sku).toLowerCase().includes(q));const rows=list.map(p=>{const current=e.stock[p.id]||0,opening=e.opening[p.id]||0,added=e.added[p.id]||0,sold=eventSoldQty(e,p.id);return`<tr><td>${productImageHtml(p,'table-thumb')}</td><td>${esc(p.name)}<div class="muted">${esc(p.sku)}</div></td><td>${p.stock}</td><td>${opening}</td><td>${added}</td><td>${sold}</td><td><strong>${current}</strong></td><td><button class="ghost" data-event-stock="${p.id}">+ Add Event Stock</button></td></tr>`}).join('');return`<div class="current-event-card"><div class="event-head"><div><span class="eyebrow">CURRENT EVENT</span><h3>${esc(e.name)}</h3><p>${fmtDate(e.start)}${e.end&&e.end!==e.start?' – '+fmtDate(e.end):''} · ${eventMoney(eventRevenue(e),e)} sales · ${eventUnitsSold(e)} units sold · ${eventActiveIds(e).length} active products · ${eventCurrency(e)}</p></div><div class="action-row"><button class="ghost" data-edit-event="${e.id}">Edit Event</button><button class="primary" data-manage-event="${e.id}">Manage Products & Stock</button><button class="ghost" data-open-pos>Open POS</button><button class="danger-btn" data-close-current>Close Event</button></div></div><div class="event-list-tools"><input id="eventProductSearch" value="${esc(eventListSearch)}" placeholder="Search active event products…"><select id="eventProductCategory"><option value="">All categories</option>${cats.map(x=>`<option value="${esc(x)}" ${x===cat?'selected':''}>${esc(x)}</option>`).join('')}</select></div><div class="table-wrap"><table><thead><tr><th>Image</th><th>Product</th><th>Master</th><th>Initial</th><th>Added</th><th>Sold</th><th>Event Left</th><th>Action</th></tr></thead><tbody>${rows||'<tr><td colspan="8" class="muted">No matching products.</td></tr>'}</tbody></table></div></div>`}
+function renderEvents(){
+  const cur=currentEvent();
+
+  $('#currentEventPanel').innerHTML=cur
+    ?renderCurrentEvent(cur)
+    :'<div class="empty-event"><strong>No open event selected.</strong><span>Create an event to allocate booth inventory.</span></div>';
+
+  $('#eventsTable').innerHTML=db.events
+    .filter(e=>!e.deletedPending)
+    .slice()
+    .sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt))
+    .map(e=>`<tr>
+      <td><strong>${esc(e.name)}</strong></td>
+      <td>${fmtDate(e.start)}${e.end&&e.end!==e.start?' – '+fmtDate(e.end):''}</td>
+      <td><span class="status-pill ${e.status==='closed'?'voided':'active'}">${e.status==='closed'?'CLOSED':'OPEN'}</span></td>
+      <td>${eventMoney(eventRevenue(e),e)}</td>
+      <td>${eventUnitsSold(e)}</td>
+      <td><div class="action-row">
+        ${e.status==='open'
+          ?`<button class="ghost" data-use-event="${e.id}">${db.currentEventId===e.id?'Using':'Use POS'}</button><button class="danger-btn" data-close-event="${e.id}">Close</button>`
+          :`<button class="ghost" data-view-event="${e.id}">View</button><button class="danger-btn" data-delete-event="${e.id}">Delete</button>`
+        }
+      </div></td>
+    </tr>`).join('')||'<tr><td colspan="6" class="muted">No events yet.</td></tr>';
+
+  $$('[data-use-event]').forEach(btn=>btn.onclick=()=>{
+    db.currentEventId=btn.dataset.useEvent;
+    db.cart=[];
+    save();
+    renderAll();
+    switchView('pos');
+    toast('Event selected');
+  });
+
+  $$('[data-close-event]').forEach(btn=>btn.onclick=()=>closeEvent(btn.dataset.closeEvent));
+  $$('[data-view-event]').forEach(btn=>btn.onclick=()=>viewClosedEvent(btn.dataset.viewEvent));
+
+  const s=$('#eventProductSearch');
+  if(s)s.oninput=e=>{
+    eventListSearch=e.target.value;
+    renderEvents();
+  };
+
+  const c=$('#eventProductCategory');
+  if(c)c.onchange=e=>{
+    eventListCategory=e.target.value;
+    renderEvents();
+  };
+
+  $$('[data-edit-event]').forEach(btn=>btn.onclick=()=>openEditEvent(btn.dataset.editEvent));
+  $$('[data-manage-event]').forEach(btn=>btn.onclick=()=>openManageEvent(btn.dataset.manageEvent));
+  $$('[data-event-stock]').forEach(btn=>btn.onclick=()=>openEventStock(cur?.id,btn.dataset.eventStock));
+  $$('[data-remove-event-product]').forEach(btn=>btn.onclick=()=>removeProductFromEvent(btn.dataset.removeEventProduct));
+}
+function renderCurrentEvent(e){
+  const cats=[...new Set([...CATEGORIES,...db.products.map(p=>p.category).filter(Boolean)])],
+    q=eventListSearch.toLowerCase(),
+    cat=eventListCategory;
+
+  const list=db.products.filter(p=>
+    e.activeProducts?.[p.id]&&
+    (!cat||p.category===cat)&&
+    (p.name+' '+p.sku).toLowerCase().includes(q)
+  );
+
+  const rows=list.map(p=>{
+    const current=e.stock[p.id]||0,
+      opening=e.opening[p.id]||0,
+      added=e.added[p.id]||0,
+      sold=eventSoldQty(e,p.id);
+
+    return`<tr>
+      <td>${productImageHtml(p,'table-thumb')}</td>
+      <td>${esc(p.name)}<div class="muted">${esc(p.sku)}</div></td>
+      <td>${p.stock}</td>
+      <td>${opening}</td>
+      <td>${added}</td>
+      <td>${sold}</td>
+      <td><strong>${current}</strong></td>
+      <td><div class="action-row">
+        <button class="ghost" data-event-stock="${p.id}">+ Add Event Stock</button>
+        <button class="danger-btn" data-remove-event-product="${p.id}">Remove</button>
+      </div></td>
+    </tr>`;
+  }).join('');
+
+  return`<div class="current-event-card">
+    <div class="event-head">
+      <div>
+        <span class="eyebrow">CURRENT EVENT</span>
+        <h3>${esc(e.name)}</h3>
+        <p>${fmtDate(e.start)}${e.end&&e.end!==e.start?' – '+fmtDate(e.end):''} · ${eventMoney(eventRevenue(e),e)} sales · ${eventUnitsSold(e)} units sold · ${eventActiveIds(e).length} active products · ${eventCurrency(e)}</p>
+      </div>
+      <div class="action-row">
+        <button class="ghost" data-edit-event="${e.id}">Edit Event</button>
+        <button class="primary" data-manage-event="${e.id}">Manage Products & Stock</button>
+        <button class="ghost" data-open-pos>Open POS</button>
+        <button class="danger-btn" data-close-current>Close Event</button>
+      </div>
+    </div>
+
+    <div class="event-list-tools">
+      <input id="eventProductSearch" value="${esc(eventListSearch)}" placeholder="Search active event products…">
+      <select id="eventProductCategory">
+        <option value="">All categories</option>
+        ${cats.map(x=>`<option value="${esc(x)}" ${x===cat?'selected':''}>${esc(x)}</option>`).join('')}
+      </select>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Image</th><th>Product</th><th>Master</th><th>Initial</th><th>Added</th><th>Sold</th><th>Event Left</th><th>Action</th></tr></thead>
+        <tbody>${rows||'<tr><td colspan="8" class="muted">No matching products.</td></tr>'}</tbody>
+      </table>
+    </div>
+  </div>`;
+}
 function visibleEventDraftProducts(){
   const q=(eventDraft.search||'').toLowerCase(),cat=eventDraft.category||'';
   return db.products.filter(p=>(!cat||p.category===cat)&&(p.name+' '+p.sku).toLowerCase().includes(q));
@@ -552,6 +665,84 @@ function bindEventStockDialogDismiss(){
     if(outside)closeEventStockDialog();
   });
 }
+async function removeProductFromEvent(productId){
+  const e=currentEvent(),p=prod(productId);
+  if(!e||e.status!=='open'||!p)return;
+
+  const remaining=Math.max(0,Number(e.stock?.[productId])||0),
+    sold=eventSoldQty(e,productId);
+
+  const message=remaining>0
+    ?`Remove ${p.name} from this event?\n\n${remaining} unsold unit${remaining===1?'':'s'} will return to Master Stock.${sold>0?`\n${sold} sold unit${sold===1?'':'s'} will stay in Sales History.`:''}`
+    :`Remove ${p.name} from this event?\n\nThere is no unsold Event Stock to return.${sold>0?`\n${sold} sold unit${sold===1?'':'s'} will stay in Sales History.`:''}`;
+
+  if(!confirm(message))return;
+
+  if(remaining>0){
+    p.stock=(Number(p.stock)||0)+remaining;
+    e.stock[productId]=0;
+
+    e.returned=e.returned||{};
+    e.returned[productId]=(Number(e.returned[productId])||0)+remaining;
+
+    db.movements.push({
+      id:uid('m'),createdAt:nowISO(),productId:p.id,sku:p.sku,name:p.name,
+      delta:remaining,scope:'master',eventId:e.id,eventName:e.name,
+      reason:'Removed from event / stock returned',receipt:''
+    });
+
+    db.movements.push({
+      id:uid('m'),createdAt:nowISO(),productId:p.id,sku:p.sku,name:p.name,
+      delta:-remaining,scope:'event',eventId:e.id,eventName:e.name,
+      reason:'Removed from event',receipt:''
+    });
+  }
+
+  e.activeProducts=e.activeProducts||{};
+  e.activeProducts[productId]=false;
+
+  markEventPending(e.id);
+
+  const pendingProducts=getPendingProductIds();
+  pendingProducts.add(p.id);
+  setPendingProductIds(pendingProducts);
+
+  save();
+  renderAll();
+
+  if(cloudSession&&sb&&navigator.onLine){
+    try{
+      if(remaining>0){
+        const productsOK=await syncPendingProducts(false);
+        if(!productsOK)throw new Error('Master Stock sync did not complete');
+      }
+
+      const eventOK=await syncPendingEvents(false);
+      if(!eventOK)throw new Error('Event Inventory sync did not complete');
+
+      await pullCloudProducts({auto:true,silent:true});
+      await pullCloudEvents({showToast:false});
+      await refreshCurrentEventInventoryFromCloud();
+      renderAll();
+
+      toast(remaining>0
+        ?`${remaining} unit${remaining===1?'':'s'} returned to Master Stock`
+        :'Product removed from event'
+      );
+    }catch(err){
+      console.error('Remove event product sync failed',err);
+      setCloudStatus('Cloud: event removal pending','warn');
+      renderCloudPanel(`Product removal is saved locally and protected, but cloud sync is pending: ${formatCloudError(err)}`);
+      toast('Removed locally · cloud sync pending');
+    }
+  }else{
+    toast(remaining>0
+      ?`${remaining} unit${remaining===1?'':'s'} returned locally · sync pending`
+      :'Product removed locally · sync pending'
+    );
+  }
+}
+
 function openEventStock(eventId,productId){const e=eventById(eventId),p=prod(productId);if(!e||e.status!=='open'||!p)return;bindEventStockDialogDismiss();$('#eventStockEventId').value=e.id;$('#eventStockProductId').value=p.id;$('#eventStockProductName').textContent=`${p.name} · Event left ${e.stock[p.id]||0} · Master available ${p.stock}`;$('#eventStockQty').value='';$('#eventStockSource').value='master';const d=$('#eventStockDialog');if(!d.open)d.showModal()}
 function saveEventStock(e){e.preventDefault();const ev=eventById($('#eventStockEventId').value),p=prod($('#eventStockProductId').value),q=+$('#eventStockQty').value,source=$('#eventStockSource').value;if(!ev||!p||q<=0)return toast('Enter a quantity');if(source==='master'&&q>p.stock)return toast(`Only ${p.stock} available in Master Stock`);ev.activeProducts[p.id]=true;if(source==='master'){p.stock-=q;db.movements.push({id:uid('m'),createdAt:nowISO(),productId:p.id,sku:p.sku,name:p.name,delta:-q,scope:'master',eventId:ev.id,eventName:ev.name,reason:'Transferred to event',receipt:''})}else{db.movements.push({id:uid('m'),createdAt:nowISO(),productId:p.id,sku:p.sku,name:p.name,delta:q,scope:'company',eventId:ev.id,eventName:ev.name,reason:'New stock received directly at event',receipt:''})}ev.stock[p.id]=(ev.stock[p.id]||0)+q;ev.added[p.id]=(ev.added[p.id]||0)+q;db.movements.push({id:uid('m'),createdAt:nowISO(),productId:p.id,sku:p.sku,name:p.name,delta:q,scope:'event',eventId:ev.id,eventName:ev.name,reason:source==='master'?'Mid-event transfer':'New stock received at event',receipt:''});save();$('#eventStockDialog').close();renderAll();toast('Event stock added')}
 async function closeEvent(id){
@@ -2424,7 +2615,17 @@ function switchView(name){$$('.tab').forEach(x=>x.classList.toggle('active',x.da
 const te=new TextEncoder();function crc32(bytes){let c=-1;for(const b of bytes){c^=b;for(let k=0;k<8;k++)c=(c>>>1)^((c&1)?0xEDB88320:0)}return(c^-1)>>>0}function u16(n){return[n&255,(n>>>8)&255]}function u32(n){return[n&255,(n>>>8)&255,(n>>>16)&255,(n>>>24)&255]}function zipStore(files){let parts=[],central=[],offset=0;for(const[name,text]of Object.entries(files)){const nb=te.encode(name),data=te.encode(text),crc=crc32(data),local=new Uint8Array([80,75,3,4,20,0,0,0,0,0,0,0,0,0,...u32(crc),...u32(data.length),...u32(data.length),...u16(nb.length),0,0]);parts.push(local,nb,data);const cen=new Uint8Array([80,75,1,2,20,0,20,0,0,0,0,0,0,0,0,0,...u32(crc),...u32(data.length),...u32(data.length),...u16(nb.length),0,0,0,0,0,0,0,0,0,0,0,0,...u32(offset)]);central.push(cen,nb);offset+=local.length+nb.length+data.length}const centralSize=central.reduce((s,a)=>s+a.length,0),end=new Uint8Array([80,75,5,6,0,0,0,0,...u16(Object.keys(files).length),...u16(Object.keys(files).length),...u32(centralSize),...u32(offset),0,0]);return new Blob([...parts,...central,end],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})}function xml(s){return String(s??'').replace(/[<>&'\"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;',"'":'&apos;','"':'&quot;'}[c]))}function colName(n){let s='';while(n){n--;s=String.fromCharCode(65+n%26)+s;n=Math.floor(n/26)}return s}function sheetXml(rows){return`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${rows.map((r,ri)=>`<row r="${ri+1}">${r.map((v,ci)=>{const ref=colName(ci+1)+(ri+1);if(typeof v==='number'&&Number.isFinite(v))return`<c r="${ref}"><v>${v}</v></c>`;return`<c r="${ref}" t="inlineStr"><is><t>${xml(v)}</t></is></c>`}).join('')}</row>`).join('')}</sheetData></worksheet>`}
 function workbookData(mode='all'){let sales=db.sales;if(mode==='today')sales=sales.filter(s=>new Date(s.createdAt).toDateString()===new Date().toDateString());if(mode==='event'){const e=currentEvent();sales=e?db.sales.filter(s=>s.eventId===e.id):[]}const eventRows=db.events.map(e=>[e.name,e.start,e.end,e.status,eventCurrency(e),eventExchangeRate(e),new Date(e.createdAt).toLocaleString('en-SG'),e.closedAt?new Date(e.closedAt).toLocaleString('en-SG'):'',eventRevenue(e),eventUnitsSold(e)]),eventInv=[];for(const e of db.events)for(const p of db.products){const initial=e.opening[p.id]||0,added=e.added[p.id]||0,returned=e.returned[p.id]||0,sold=eventSales(e).reduce((n,s)=>n+s.items.filter(i=>i.productId===p.id).reduce((a,i)=>a+i.qty,0),0);if(initial||added||returned||sold||(e.stock[p.id]||0))eventInv.push([e.name,e.status,p.sku,p.name,p.category||'',initial,added,sold,e.stock[p.id]||0,returned])}return[['Sales',[['Receipt','Event','Date/Time','Payment','Currency','Exchange Rate','Subtotal','Bundle Discount','Total','Status'],...sales.map(s=>[s.receipt,s.eventName||'Legacy / Master',new Date(s.createdAt).toLocaleString('en-SG'),s.payment,s.currencyCode||'SGD',s.exchangeRate||1,s.subtotal??s.total,s.bundleDiscount||0,s.total,activeSale(s)?(s.editedAt?'Edited':'Completed'):'Voided'])]],['Items Sold',[['Receipt','Event','Status','Currency','SKU','Product','Category','Qty','Unit Price','Free Gift'],...sales.flatMap(s=>s.items.map(i=>[s.receipt,s.eventName||'Legacy / Master',activeSale(s)?'Active':'Voided',s.currencyCode||'SGD',i.sku,i.name,i.category||'',i.qty,i.unitPrice,i.promo?'Yes':'No']))]],['Master Inventory',[['SKU','Product','Category','Base Price (SGD)','Master Available','Low Stock Alert'],...db.products.map(p=>[p.sku,p.name,p.category||'',p.price,p.stock,p.low])]],['Events',[['Event','Start','End','Status','Currency','Exchange Rate','Created','Closed','Sales','Units Sold'],...eventRows]],['Event Inventory',[['Event','Status','SKU','Product','Category','Initial','Added','Sold','Event Left','Returned to Master'],...eventInv]],['Promotions',[['Type','Applies To','Quantity','Base Bundle Price (SGD)','Free Gift','Gift Qty','Active'],...db.bundlePromos.map(pr=>['Bundle price',(pr.categories||[]).join(' + '),pr.qty,pr.bundlePrice,'','',pr.active?'Yes':'No']),...db.promos.map(pr=>{const b=prod(pr.buy),g=prod(pr.gift);return['Free gift',`${b?.sku||''} ${b?.name||''}`,pr.buyQty,'',`${g?.sku||''} ${g?.name||''}`,pr.giftQty,pr.active?'Yes':'No']})]],['Stock Movements',[['Date/Time','Scope','Event','SKU','Product','Change','Reason','Receipt'],...db.movements.map(m=>[new Date(m.createdAt).toLocaleString('en-SG'),m.scope||'master',m.eventName||'',m.sku,m.name,m.delta,m.reason,m.receipt||''])]]]}
 function exportXlsx(mode='all'){if(mode==='event'&&!currentEvent())return toast('Select an open event first');const sheets=workbookData(mode),files={};files['[Content_Types].xml']=`<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>${sheets.map((_,i)=>`<Override PartName="/xl/worksheets/sheet${i+1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')}</Types>`;files['_rels/.rels']=`<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`;files['xl/workbook.xml']=`<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${sheets.map((s,i)=>`<sheet name="${xml(s[0])}" sheetId="${i+1}" r:id="rId${i+1}"/>`).join('')}</sheets></workbook>`;files['xl/_rels/workbook.xml.rels']=`<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${sheets.map((_,i)=>`<Relationship Id="rId${i+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i+1}.xml"/>`).join('')}</Relationships>`;sheets.forEach((s,i)=>files[`xl/worksheets/sheet${i+1}.xml`]=sheetXml(s[1]));download(zipStore(files),`HeyNikko_POS_${mode}_${new Date().toISOString().slice(0,10)}.xlsx`)}function download(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000)}function backup(){download(new Blob([JSON.stringify(db,null,2)],{type:'application/json'}),`HeyNikko_POS_Backup_${new Date().toISOString().slice(0,10)}.json`)}
-renderCategoryOptions();resetProductCloudSnapshot();$('#cloudLoginForm').onsubmit=cloudLoginSubmit;$('#cloudRetryLibraryBtn').onclick=retryCloudLibrary;$('#cloudOfflineBtn').onclick=()=>{if($('#cloudLoginDialog').open)$('#cloudLoginDialog').close();setCloudStatus('Cloud: offline mode','off');renderCloudPanel('Working from this device only until you sign in.')};$('#cloudAccountBtn').onclick=()=>cloudSession?switchView('export'):openCloudLogin();$('#cloudSyncAllBtn').onclick=syncAllToCloud;$('#cloudPullAllBtn').onclick=pullAllFromCloud;$('#cloudMigrateBtn').onclick=migrateLocalProductsToCloud;$('#cloudPullBtn').onclick=()=>pullCloudProducts();$('#cloudSyncBtn').onclick=()=>syncPendingProducts(true);$('#cloudImageSyncBtn').onclick=syncMissingProductImages;$('#cloudEventPushBtn').onclick=()=>syncEventsToCloud(true);$('#cloudEventPullBtn').onclick=()=>pullCloudEvents({showToast:true});$('#inventoryRecoveryBtn').onclick=recoverLastClosedEventStock;$('#cloudSignOutBtn').onclick=cloudSignOut;$$('.tab').forEach(b=>b.onclick=()=>switchView(b.dataset.view));$('#search').oninput=renderProducts;$('#categoryFilter').onchange=()=>{renderPosCategoryButtons();renderProducts()};$('#clearCart').onclick=()=>{db.cart=[];save();renderCart()};$('#payCash').onclick=()=>checkout('Cash');$('#payPaynow').onclick=()=>checkout('PayNow');$('#addProductBtn').onclick=()=>openProduct();$('#productForm').onsubmit=saveProductForm;const cancelProductDialog=$('#cancelProductDialog');if(cancelProductDialog)cancelProductDialog.onclick=e=>{e.preventDefault();e.stopPropagation();closeProductDialog()};const addProductCategory=$('#addProductCategory');if(addProductCategory)addProductCategory.onclick=addNewProductCategory;bindProductDialogDismiss();$('#productImage').onchange=handleProductImage;$('#removeProductImage').onclick=()=>{setImagePreview('');$('#productImage').value=''};$('#stockForm').onsubmit=saveStockForm;const cancelStockAdjustment=$('#cancelStockAdjustment');if(cancelStockAdjustment)cancelStockAdjustment.onclick=e=>{e.preventDefault();e.stopPropagation();closeStockAdjustmentDialog()};bindStockAdjustmentDismiss();$('#createEventBtn').onclick=openCreateEvent;$('#eventForm').onsubmit=saveEventForm;$('#eventCurrency').onchange=()=>{if($('#eventCurrency').value==='SGD')$('#eventExchangeRate').value='1';else if(Number($('#eventExchangeRate').value)===1)$('#eventExchangeRate').value='';updateEventCurrencyUI()};$('#eventExchangeRate').oninput=updateEventCurrencyUI;$('#eventPriceRounding').onchange=updateEventCurrencyUI;const cancelEventCreate=$('#cancelEventCreate');if(cancelEventCreate)cancelEventCreate.onclick=()=>$('#eventDialog').close();$('#eventSetupSearch').oninput=e=>{eventDraft.search=e.target.value;renderEventDraft()};$('#eventSetupCategory').onchange=e=>{eventDraft.category=e.target.value;renderEventDraft()};$('#selectVisibleProducts').onclick=()=>setDraftVisible(true);$('#useMasterQtyCreateEvent').onclick=useMasterQtyForCreateEvent;$('#clearVisibleProducts').onclick=()=>setDraftVisible(false);$('#copyEventBtn').onclick=copyPreviousEvent;$('#eventCsvInput').onchange=e=>{importEventCsv(e.target.files[0],'create');e.target.value=''};$('#eventStockForm').onsubmit=saveEventStock;const cancelEventStock=$('#cancelEventStock');if(cancelEventStock)cancelEventStock.onclick=e=>{e.preventDefault();e.stopPropagation();closeEventStockDialog()};bindEventStockDialogDismiss();$('#manageSearch').oninput=e=>{manageDraft.search=e.target.value;renderManageDraft()};$('#manageCategory').onchange=e=>{manageDraft.category=e.target.value;renderManageDraft()};$('#manageCsvInput').onchange=e=>{importEventCsv(e.target.files[0],'manage');e.target.value=''};$('#saveManageEvent').onclick=saveManageEvent;$('#addPromoBtn').onclick=openPromo;$('#promoType').onchange=togglePromoFields;$('#bundleTargetType').onchange=toggleBundleTargetFields;$('#promoProductSearch').oninput=renderPromoProductChecks;$('#promoSelectVisible').onclick=()=>{$$('#promoProductChecks input').forEach(x=>x.checked=true);updatePromoProductCount()};$('#promoClearProducts').onclick=()=>{$$('#promoProductChecks input').forEach(x=>x.checked=false);updatePromoProductCount()};$$('.promo-currency-tab').forEach(b=>b.onclick=()=>setPromoCurrencyFilter(b.dataset.promoCurrency));$('#promoForm').onsubmit=savePromoForm;$('#promoDialog').addEventListener('close',()=>{$('#promoType').disabled=false;editingPromoId='';editingPromoKind='';});$('#salesApplyDate').onclick=()=>{
+renderCategoryOptions();resetProductCloudSnapshot();$('#cloudLoginForm').onsubmit=cloudLoginSubmit;$('#cloudRetryLibraryBtn').onclick=retryCloudLibrary;$('#cloudOfflineBtn').onclick=()=>{if($('#cloudLoginDialog').open)$('#cloudLoginDialog').close();setCloudStatus('Cloud: offline mode','off');renderCloudPanel('Working from this device only until you sign in.')};$('#cloudAccountBtn').onclick=()=>cloudSession?switchView('export'):openCloudLogin();$('#cloudSyncAllBtn').onclick=syncAllToCloud;$('#cloudPullAllBtn').onclick=pullAllFromCloud;$('#cloudMigrateBtn').onclick=migrateLocalProductsToCloud;$('#cloudPullBtn').onclick=()=>pullCloudProducts();$('#cloudSyncBtn').onclick=()=>syncPendingProducts(true);$('#cloudImageSyncBtn').onclick=syncMissingProductImages;$('#cloudEventPushBtn').onclick=()=>syncEventsToCloud(true);$('#cloudEventPullBtn').onclick=()=>pullCloudEvents({showToast:true});$('#inventoryRecoveryBtn').onclick=recoverLastClosedEventStock;$('#cloudSignOutBtn').onclick=cloudSignOut;$$('.tab').forEach(b=>b.onclick=()=>switchView(b.dataset.view));$('#search').oninput=renderProducts;$('#categoryFilter').onchange=()=>{renderPosCategoryButtons();renderProducts()};$('#clearCart').onclick=()=>{db.cart=[];save();renderCart()};$('#payCash').onclick=()=>checkout('Cash');$('#payPaynow').onclick=()=>checkout('PayNow');$('#addProductBtn').onclick=()=>openProduct();$('#productForm').onsubmit=saveProductForm;const cancelProductDialog=$('#cancelProductDialog');if(cancelProductDialog)cancelProductDialog.onclick=e=>{e.preventDefault();e.stopPropagation();closeProductDialog()};const addProductCategory=$('#addProductCategory');if(addProductCategory)addProductCategory.onclick=addNewProductCategory;bindProductDialogDismiss();$('#productImage').onchange=handleProductImage;$('#removeProductImage').onclick=()=>{setImagePreview('');$('#productImage').value=''};document.addEventListener('click',e=>{
+  const edit=e.target.closest?.('[data-edit-event]');
+  if(edit){e.preventDefault();openEditEvent(edit.dataset.editEvent);return}
+
+  const manage=e.target.closest?.('[data-manage-event]');
+  if(manage){e.preventDefault();openManageEvent(manage.dataset.manageEvent);return}
+
+  const remove=e.target.closest?.('[data-remove-event-product]');
+  if(remove){e.preventDefault();removeProductFromEvent(remove.dataset.removeEventProduct);return}
+});
+$('#stockForm').onsubmit=saveStockForm;const cancelStockAdjustment=$('#cancelStockAdjustment');if(cancelStockAdjustment)cancelStockAdjustment.onclick=e=>{e.preventDefault();e.stopPropagation();closeStockAdjustmentDialog()};bindStockAdjustmentDismiss();$('#createEventBtn').onclick=openCreateEvent;$('#eventForm').onsubmit=saveEventForm;$('#eventCurrency').onchange=()=>{if($('#eventCurrency').value==='SGD')$('#eventExchangeRate').value='1';else if(Number($('#eventExchangeRate').value)===1)$('#eventExchangeRate').value='';updateEventCurrencyUI()};$('#eventExchangeRate').oninput=updateEventCurrencyUI;$('#eventPriceRounding').onchange=updateEventCurrencyUI;const cancelEventCreate=$('#cancelEventCreate');if(cancelEventCreate)cancelEventCreate.onclick=()=>$('#eventDialog').close();$('#eventSetupSearch').oninput=e=>{eventDraft.search=e.target.value;renderEventDraft()};$('#eventSetupCategory').onchange=e=>{eventDraft.category=e.target.value;renderEventDraft()};$('#selectVisibleProducts').onclick=()=>setDraftVisible(true);$('#useMasterQtyCreateEvent').onclick=useMasterQtyForCreateEvent;$('#clearVisibleProducts').onclick=()=>setDraftVisible(false);$('#copyEventBtn').onclick=copyPreviousEvent;$('#eventCsvInput').onchange=e=>{importEventCsv(e.target.files[0],'create');e.target.value=''};$('#eventStockForm').onsubmit=saveEventStock;const cancelEventStock=$('#cancelEventStock');if(cancelEventStock)cancelEventStock.onclick=e=>{e.preventDefault();e.stopPropagation();closeEventStockDialog()};bindEventStockDialogDismiss();$('#manageSearch').oninput=e=>{manageDraft.search=e.target.value;renderManageDraft()};$('#manageCategory').onchange=e=>{manageDraft.category=e.target.value;renderManageDraft()};$('#manageCsvInput').onchange=e=>{importEventCsv(e.target.files[0],'manage');e.target.value=''};$('#saveManageEvent').onclick=saveManageEvent;$('#addPromoBtn').onclick=openPromo;$('#promoType').onchange=togglePromoFields;$('#bundleTargetType').onchange=toggleBundleTargetFields;$('#promoProductSearch').oninput=renderPromoProductChecks;$('#promoSelectVisible').onclick=()=>{$$('#promoProductChecks input').forEach(x=>x.checked=true);updatePromoProductCount()};$('#promoClearProducts').onclick=()=>{$$('#promoProductChecks input').forEach(x=>x.checked=false);updatePromoProductCount()};$$('.promo-currency-tab').forEach(b=>b.onclick=()=>setPromoCurrencyFilter(b.dataset.promoCurrency));$('#promoForm').onsubmit=savePromoForm;$('#promoDialog').addEventListener('close',()=>{$('#promoType').disabled=false;editingPromoId='';editingPromoKind='';});$('#salesApplyDate').onclick=()=>{
   const from=$('#salesDateFrom').value||'',to=$('#salesDateTo').value||'';
   if(from&&to&&from>to)return toast('From date cannot be after To date');
   setSalesDateRange(from,to);

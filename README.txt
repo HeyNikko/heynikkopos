@@ -1052,3 +1052,35 @@ Promos configured in both currencies appear under both currency filters.
 Free Gift promos are marked Universal.
 
 Edit / Disable / Delete and the promo cloud sync protections remain unchanged.
+
+
+V8.7.5 — EVENT CONTROLS + REMOVE PRODUCT
+----------------------------------------
+No Supabase SQL changes are required.
+
+FIXED
+-----
+Edit Event and Manage Products & Stock buttons now work again.
+The previous renderEvents() handler contained a malformed Edit/Manage binding.
+
+REMOVE PRODUCT FROM EVENT
+-------------------------
+Each active event product now has:
+- + Add Event Stock
+- Remove
+
+Remove does the following:
+- returns remaining UNSOLD Event Stock to Master Stock
+- sets Event Stock to 0
+- removes the product from the active Event / POS
+- preserves completed sales already made
+- does NOT return sold units
+- syncs both Master Stock and Event Inventory to Supabase
+
+Example:
+Initial event stock: 10
+Sold: 3
+Event left: 7
+
+Remove -> 7 returns to Master Stock.
+The 3 sold units remain in Sales History.

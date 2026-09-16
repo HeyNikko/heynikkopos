@@ -300,3 +300,36 @@ select,select.ios-select{color:#332b22!important;-webkit-text-fill-color:#332b22
 .promo-currency-badges{display:flex;gap:6px;flex-wrap:wrap}
 .currency-pill.sgd,.currency-pill.twd,.currency-pill.universal{min-width:44px;justify-content:center}
 @media(max-width:700px){.promo-currency-toolbar{align-items:flex-start;flex-direction:column}}
+
+/* V8.7.7 compact dynamic POS categories */
+#categoryButtons{
+  display:flex!important;
+  flex-wrap:wrap!important;
+  align-items:center;
+  gap:6px!important;
+  overflow:visible!important;
+  white-space:normal!important;
+}
+#categoryButtons .v72-category-btn{
+  flex:0 0 auto;
+  padding:8px 12px!important;
+  min-height:34px!important;
+  border-radius:18px!important;
+  font-size:13px!important;
+  line-height:1.05!important;
+  white-space:nowrap;
+}
+@media(max-width:900px){
+  #categoryButtons{gap:5px!important}
+  #categoryButtons .v72-category-btn{
+    padding:7px 10px!important;
+    font-size:12px!important;
+    min-height:32px!important;
+  }
+}
+@media(max-width:600px){
+  #categoryButtons .v72-category-btn{
+    padding:6px 9px!important;
+    font-size:11.5px!important;
+  }
+}

@@ -1108,3 +1108,26 @@ V8.7.6 now uses the same dynamic allCategories() source for:
 Example:
 If you add "Sticker Pack" or "Big Stickers", those buttons will appear beside the
 existing POS categories after the product is saved/synced.
+
+
+V8.7.7 — COMPACT + GROUPED POS CATEGORIES
+-----------------------------------------
+No Supabase SQL changes are required.
+
+FIXED
+-----
+Category buttons are now smaller and wrap onto another row if the screen is too narrow.
+No category should be pushed off-screen.
+
+Sticker-related categories are grouped together automatically.
+
+Preferred order:
+All
+Stickers
+Sticker Sheets
+Sticker Pack
+Big Stickers
+then Keychain, Postcard, Lifestyle, followed by other categories.
+
+Any future custom category containing the word "Sticker" is also kept with the
+sticker group automatically.

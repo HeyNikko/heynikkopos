@@ -22,8 +22,37 @@ function saveCustomCategories(list){
   localStorage.setItem(CUSTOM_CATEGORIES_KEY,JSON.stringify(clean));
 }
 function allCategories(){
-  const productCats=(db?.products||[]).map(p=>String(p.category||'').trim()).filter(Boolean);
-  return [...new Set([...CATEGORIES,...getCustomCategories(),...productCats])];
+  const productCats=(db?.products||[]).map(p=>String(p.category||'').trim()).filter(Boolean),
+    custom=getCustomCategories(),
+    raw=[...new Set([...CATEGORIES,...custom,...productCats])],
+    exactStickerOrder=['Stickers','Sticker Sheets','Sticker Pack','Big Stickers'];
+
+  return raw.sort((a,b)=>{
+    const ai=exactStickerOrder.findIndex(x=>x.toLowerCase()===a.toLowerCase()),
+      bi=exactStickerOrder.findIndex(x=>x.toLowerCase()===b.toLowerCase()),
+      aSticker=/sticker/i.test(a),
+      bSticker=/sticker/i.test(b);
+
+    if(ai>=0||bi>=0){
+      if(ai>=0&&bi>=0)return ai-bi;
+      if(ai>=0)return -1;
+      if(bi>=0)return 1;
+    }
+
+    if(aSticker!==bSticker)return aSticker?-1:1;
+
+    const defaultOrder=['Keychain','Postcard','Lifestyle'],
+      ad=defaultOrder.findIndex(x=>x.toLowerCase()===a.toLowerCase()),
+      bd=defaultOrder.findIndex(x=>x.toLowerCase()===b.toLowerCase());
+
+    if(ad>=0||bd>=0){
+      if(ad>=0&&bd>=0)return ad-bd;
+      if(ad>=0)return -1;
+      if(bd>=0)return 1;
+    }
+
+    return a.localeCompare(b);
+  });
 }
 function addNewProductCategory(){
   const raw=prompt('New category name');

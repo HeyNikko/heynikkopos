@@ -728,3 +728,30 @@ CLOUD SAFETY
 ------------
 Only one optional products.twd_price column is added.
 No Event, Sales, Event Inventory, void, close, delete, Realtime, or stock logic is changed.
+
+
+V8.6.3 — TWD PRICE CLOUD SYNC FIX
+--------------------------------
+No new Supabase SQL is required if SUPABASE_V8_6_2_SETUP.sql was already run.
+
+ROOT CAUSE
+----------
+V8.6.2 saved products.twd_price to Supabase, but the cloud product fetch path could
+omit twd_price from the selected columns. After a cloud refresh the local product
+therefore had twdPrice = 0, causing the Taiwan POS to fall back to SGD × FX.
+
+FIX
+---
+- twd_price is now included in cloud product reads
+- twdPrice is preserved in local product objects
+- TWD price is included in the product cloud fingerprint
+- product edit/open flow preserves the TWD value
+- POS labels direct Taiwan prices as "TWD direct price"
+
+Expected example:
+SGD Price: S$5.90
+TWD Price: NT$180
+Fallback FX: 1 SGD = 25 TWD
+
+Taiwan POS = NT$180
+NOT NT$148 / FX fallback.

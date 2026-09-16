@@ -994,3 +994,13 @@ FIX
 
 After installing V8.7.1, delete the unwanted duplicate promos once more.
 They should remain deleted on both PC and iPad.
+
+
+V8.7.2 — PROMO SYNC RACE FIX
+----------------------------
+No Supabase SQL changes are required.
+
+New promos are now protected by a Pending Promos queue until Supabase confirms them.
+Cloud pulls preserve pending local promos instead of overwriting them.
+Save Promo pushes immediately when online, and background/focus sync retries pending
+promo uploads. V8.7.1 permanent promo deletion remains included.

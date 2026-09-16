@@ -8,6 +8,7 @@ const CLOUD_PENDING_VOIDS_KEY='heynikko_pos_v8_pending_voids';
 const CLOUD_PENDING_DELETES_KEY='heynikko_pos_v8_pending_deletes';
 const CLOUD_PENDING_EVENT_DELETES_KEY='heynikko_pos_v8_pending_event_deletes';
 const CLOUD_PENDING_PROMO_DELETES_KEY='heynikko_pos_v8_pending_promo_deletes';
+const CLOUD_PENDING_PROMOS_KEY='heynikko_pos_v8_pending_promos';
 const CLOUD_PENDING_EVENTS_KEY='heynikko_pos_v8_pending_events';
 
 const CATEGORIES=['Stickers','Sticker Sheets','Keychain','Postcard','Lifestyle'];
@@ -600,10 +601,32 @@ function bundleTargetLabel(pr){if(pr.targetType==='products'||(pr.productIds&&pr
 function renderPromoProductChecks(){const box=$('#promoProductChecks');if(!box)return;const q=($('#promoProductSearch')?.value||'').trim().toLowerCase(),selected=new Set($$('#promoProductChecks input:checked').map(x=>x.value)),rows=db.products.filter(p=>(p.name+' '+p.sku+' '+p.category).toLowerCase().includes(q));box.innerHTML=rows.map(p=>`<label class="promo-product-option"><input type="checkbox" value="${p.id}" ${selected.has(p.id)?'checked':''}><span class="promo-product-meta"><strong>${esc(p.name)}</strong><small>${esc(p.sku)} · ${esc(p.category||'Uncategorised')} · ${money(p.price)}</small></span></label>`).join('')||'<p class="muted" style="padding:12px">No matching products.</p>';$$('#promoProductChecks input').forEach(x=>x.onchange=updatePromoProductCount);updatePromoProductCount()}
 function updatePromoProductCount(){const el=$('#promoProductCount');if(el)el.textContent=`${$$('#promoProductChecks input:checked').length} selected`}
 function toggleBundleTargetFields(){const byProducts=$('#bundleTargetType')?.value==='products';$('#bundleCategoryTarget').hidden=byProducts;$('#bundleProductTarget').hidden=!byProducts;if(byProducts)renderPromoProductChecks()}
-function renderPromos(){$('#promosTable').innerHTML=[...db.bundlePromos.map(pr=>`<tr><td>Bundle price</td><td>${esc(bundleTargetLabel(pr))}</td><td>${Number(pr.bundlePrice)>0?`<div><span class="currency-pill">SGD</span> ${pr.qty} for ${money(pr.bundlePrice)}</div>`:''}${Number(pr.twdBundlePrice)>0?`<div><span class="currency-pill">TWD</span> ${pr.qty} for ${moneyCurrency(pr.twdBundlePrice,'TWD')}</div>`:''}</td><td>${pr.active?'Active':'Disabled'}</td><td><div class="action-row"><button class="ghost" data-toggle-bundle="${pr.id}">${pr.active?'Disable':'Enable'}</button><button class="ghost" data-delete-bundle="${pr.id}">Delete</button></div></td></tr>`),...db.promos.map(pr=>{const b=prod(pr.buy),g=prod(pr.gift);return`<tr><td>Free gift</td><td>${esc(b?.name||'Missing product')} × ${pr.buyQty}</td><td>${esc(g?.name||'Missing product')} × ${pr.giftQty} free</td><td>${pr.active?'Active':'Disabled'}</td><td><div class="action-row"><button class="ghost" data-toggle-promo="${pr.id}">${pr.active?'Disable':'Enable'}</button><button class="ghost" data-delete-promo="${pr.id}">Delete</button></div></td></tr>`})].join('')||'<tr><td colspan="5" class="muted">No promotions.</td></tr>';$$('[data-toggle-bundle]').forEach(b=>b.onclick=()=>{const p=db.bundlePromos.find(x=>x.id===b.dataset.toggleBundle);p.active=!p.active;save();renderAll()});$$('[data-delete-bundle]').forEach(b=>b.onclick=()=>deletePromotion(b.dataset.deleteBundle,'bundle'));$$('[data-toggle-promo]').forEach(b=>b.onclick=()=>{const p=db.promos.find(x=>x.id===b.dataset.togglePromo);p.active=!p.active;save();recalcPromos();renderAll()});$$('[data-delete-promo]').forEach(b=>b.onclick=()=>deletePromotion(b.dataset.deletePromo,'gift'))}
+function renderPromos(){$('#promosTable').innerHTML=[...db.bundlePromos.map(pr=>`<tr><td>Bundle price</td><td>${esc(bundleTargetLabel(pr))}</td><td>${Number(pr.bundlePrice)>0?`<div><span class="currency-pill">SGD</span> ${pr.qty} for ${money(pr.bundlePrice)}</div>`:''}${Number(pr.twdBundlePrice)>0?`<div><span class="currency-pill">TWD</span> ${pr.qty} for ${moneyCurrency(pr.twdBundlePrice,'TWD')}</div>`:''}</td><td>${pr.active?'Active':'Disabled'}</td><td><div class="action-row"><button class="ghost" data-toggle-bundle="${pr.id}">${pr.active?'Disable':'Enable'}</button><button class="ghost" data-delete-bundle="${pr.id}">Delete</button></div></td></tr>`),...db.promos.map(pr=>{const b=prod(pr.buy),g=prod(pr.gift);return`<tr><td>Free gift</td><td>${esc(b?.name||'Missing product')} × ${pr.buyQty}</td><td>${esc(g?.name||'Missing product')} × ${pr.giftQty} free</td><td>${pr.active?'Active':'Disabled'}</td><td><div class="action-row"><button class="ghost" data-toggle-promo="${pr.id}">${pr.active?'Disable':'Enable'}</button><button class="ghost" data-delete-promo="${pr.id}">Delete</button></div></td></tr>`})].join('')||'<tr><td colspan="5" class="muted">No promotions.</td></tr>';$$('[data-toggle-bundle]').forEach(b=>b.onclick=async()=>{const p=db.bundlePromos.find(x=>x.id===b.dataset.toggleBundle);p.active=!p.active;markPromoPending(p.id);persistLocal();renderAll();await syncPendingPromotions(false)});$$('[data-delete-bundle]').forEach(b=>b.onclick=()=>deletePromotion(b.dataset.deleteBundle,'bundle'));$$('[data-toggle-promo]').forEach(b=>b.onclick=async()=>{const p=db.promos.find(x=>x.id===b.dataset.togglePromo);p.active=!p.active;markPromoPending(p.id);persistLocal();recalcPromos();renderAll();await syncPendingPromotions(false)});$$('[data-delete-promo]').forEach(b=>b.onclick=()=>deletePromotion(b.dataset.deletePromo,'gift'))}
 function togglePromoFields(){const gift=$('#promoType').value==='gift';$('#giftPromoFields').hidden=!gift;$('#bundlePromoFields').hidden=gift;if(!gift)toggleBundleTargetFields()}
 function openPromo(){promoOptions();$('#promoType').value='bundle';$('#bundleTargetType').value='categories';togglePromoFields();$$('#promoCategoryChecks input').forEach(x=>x.checked=false);$('#promoProductSearch').value='';renderPromoProductChecks();$$('#promoProductChecks input').forEach(x=>x.checked=false);updatePromoProductCount();$('#bundleQty').value=5;$('#bundlePrice').value='';$('#bundleTwdPrice').value='';$('#promoDialog').showModal()}
-function savePromoForm(e){e.preventDefault();if($('#promoType').value==='bundle'){const targetType=$('#bundleTargetType').value,categories=$$('#promoCategoryChecks input:checked').map(x=>x.value),productIds=$$('#promoProductChecks input:checked').map(x=>x.value),qty=+$('#bundleQty').value,bundlePrice=Math.max(0,+$('#bundlePrice').value||0),twdBundlePrice=Math.max(0,+$('#bundleTwdPrice').value||0);if(targetType==='products'&&!productIds.length)return toast('Choose at least one product');if(targetType==='categories'&&!categories.length)return toast('Choose at least one category');if(!qty||qty<1)return toast('Bundle quantity must be at least 1');if(bundlePrice<=0&&twdBundlePrice<=0)return toast('Enter at least one promo price: SGD or TWD');db.bundlePromos.push({id:uid('bp'),type:'bundle',targetType,categories:targetType==='categories'?categories:[],productIds:targetType==='products'?productIds:[],qty,bundlePrice,twdBundlePrice,active:true})}else db.promos.push({id:uid('pr'),type:'gift',buy:$('#promoBuy').value,buyQty:+$('#promoBuyQty').value,gift:$('#promoGift').value,giftQty:+$('#promoGiftQty').value,active:true});save();$('#promoDialog').close();recalcPromos();renderAll();toast('Promotion saved')}
+async function savePromoForm(e){
+  e.preventDefault();
+  let promo;
+  if($('#promoType').value==='bundle'){
+    const targetType=$('#bundleTargetType').value,categories=$$('#promoCategoryChecks input:checked').map(x=>x.value),productIds=$$('#promoProductChecks input:checked').map(x=>x.value),qty=+$('#bundleQty').value,bundlePrice=Math.max(0,+$('#bundlePrice').value||0),twdBundlePrice=Math.max(0,+$('#bundleTwdPrice').value||0);
+    if(targetType==='products'&&!productIds.length)return toast('Choose at least one product');
+    if(targetType==='categories'&&!categories.length)return toast('Choose at least one category');
+    if(!qty||qty<1)return toast('Bundle quantity must be at least 1');
+    if(bundlePrice<=0&&twdBundlePrice<=0)return toast('Enter at least one promo price: SGD or TWD');
+    promo={id:uid('bp'),type:'bundle',targetType,categories:targetType==='categories'?categories:[],productIds:targetType==='products'?productIds:[],qty,bundlePrice,twdBundlePrice,active:true};
+    db.bundlePromos.push(promo);
+  }else{
+    promo={id:uid('pr'),type:'gift',buy:$('#promoBuy').value,buyQty:+$('#promoBuyQty').value,gift:$('#promoGift').value,giftQty:+$('#promoGiftQty').value,active:true};
+    db.promos.push(promo);
+  }
+  markPromoPending(promo.id);persistLocal();$('#promoDialog').close();recalcPromos();renderAll();
+  if(cloudSession&&sb&&navigator.onLine){
+    toast('Promotion saved · syncing…');
+    const ok=await syncPendingPromotions(false);
+    if(ok){await pullCloudPromotions();renderAll();toast('Promotion saved · cloud synced')}
+    else toast('Promotion saved locally · cloud sync pending');
+  }else toast('Promotion saved offline · queued for sync');
+}
 function updateSalesBulkControls(){selectedSaleIds=new Set([...selectedSaleIds].filter(id=>db.sales.some(s=>s.id===id)));const n=selectedSaleIds.size,count=$('#salesSelectedCount'),del=$('#deleteSelectedSales'),head=$('#salesHeaderCheck');if(count)count.textContent=`${n} selected`;if(del)del.disabled=!n;if(head){head.checked=db.sales.length>0&&n===db.sales.length;head.indeterminate=n>0&&n<db.sales.length}}
 function localDateInputValue(d){
   const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');
@@ -886,7 +909,7 @@ function setPendingProductIds(set){localStorage.setItem(CLOUD_PENDING_KEY,JSON.s
 function captureChangedProducts(){if(!cloudProductSnapshot.size){resetProductCloudSnapshot();return}const pending=getPendingProductIds();for(const p of db.products){const fp=cloudFingerprint(p),old=cloudProductSnapshot.get(p.id);if(old!==undefined&&old!==fp)pending.add(p.id);if(old===undefined)pending.add(p.id)}setPendingProductIds(pending);renderCloudPanel();scheduleCloudProductSync()}
 function scheduleCloudProductSync(){if(cloudSyncTimer)clearTimeout(cloudSyncTimer);if(!navigator.onLine||!cloudSession||!sb)return;cloudSyncTimer=setTimeout(()=>syncPendingProducts(false),1000)}
 function setCloudStatus(text,state='off'){const b=$('#cloudBadge');if(b){b.textContent=text;b.className=`cloud-badge cloud-${state}`}const p=$('#cloudPanelStatus');if(p){p.textContent=text.replace('Cloud: ','');p.className=`status-pill cloud-panel-${state}`}}
-function renderCloudPanel(extra=''){const stats=$('#cloudSyncStats');if(stats){const pending=getPendingProductIds().size;stats.innerHTML=`<span>Local products: <strong>${db.products.length}</strong></span><span>Cloud products: <strong id="cloudCountValue">${window.__cloudProductCount??'—'}</strong></span><span>Pending products: <strong>${pending}</strong></span><span>Pending sales: <strong>${getPendingSaleIds().size}</strong></span><span>Pending voids: <strong>${getPendingVoidIds().size}</strong></span><span>Pending deletes: <strong>${getPendingDeleteIds().size}</strong></span><span>Pending events: <strong>${getPendingEventIds().size}</strong></span><span>Pending event deletes: <strong>${getPendingEventDeleteIds().size}</strong></span><span>Pending promo deletes: <strong>${getPendingPromoDeleteIds().size}</strong></span>`}const pr=$('#cloudProgress');if(pr&&extra)pr.textContent=extra;const account=$('#cloudAccountBtn');if(account)account.textContent=cloudSession?.user?.email||'Sign in'}
+function renderCloudPanel(extra=''){const stats=$('#cloudSyncStats');if(stats){const pending=getPendingProductIds().size;stats.innerHTML=`<span>Local products: <strong>${db.products.length}</strong></span><span>Cloud products: <strong id="cloudCountValue">${window.__cloudProductCount??'—'}</strong></span><span>Pending products: <strong>${pending}</strong></span><span>Pending sales: <strong>${getPendingSaleIds().size}</strong></span><span>Pending voids: <strong>${getPendingVoidIds().size}</strong></span><span>Pending deletes: <strong>${getPendingDeleteIds().size}</strong></span><span>Pending events: <strong>${getPendingEventIds().size}</strong></span><span>Pending event deletes: <strong>${getPendingEventDeleteIds().size}</strong></span><span>Pending promos: <strong>${getPendingPromoIds().size}</strong></span><span>Pending promo deletes: <strong>${getPendingPromoDeleteIds().size}</strong></span>`}const pr=$('#cloudProgress');if(pr&&extra)pr.textContent=extra;const account=$('#cloudAccountBtn');if(account)account.textContent=cloudSession?.user?.email||'Sign in'}
 async function refreshCloudProductCount(){if(!sb||!cloudSession)return;const {count,error}=await sb.from('products').select('*',{count:'exact',head:true});if(!error){window.__cloudProductCount=count||0;renderCloudPanel()}}
 function safeFileName(s){return String(s||'product').replace(/[^a-z0-9_-]+/gi,'-').replace(/^-+|-+$/g,'').toLowerCase()||'product'}
 async function uploadCloudProductImage(p){const src=p.image||'';if(!src||!src.startsWith('data:'))return src||null;const res=await fetch(src);const blob=await res.blob();const ext=blob.type.includes('png')?'png':'jpg';const path=`products/${safeFileName(p.sku)}-${Date.now()}.${ext}`;const {error}=await sb.storage.from('product-images').upload(path,blob,{contentType:blob.type||'image/jpeg',upsert:true});if(error)throw error;const {data}=sb.storage.from('product-images').getPublicUrl(path);return data?.publicUrl||null}
@@ -1013,6 +1036,12 @@ function captureChangedEvents(){
 function markEventPending(id){
   const pending=getPendingEventIds();pending.add(id);setPendingEventIds(pending);
 }
+function getPendingPromoIds(){try{return new Set(JSON.parse(localStorage.getItem(CLOUD_PENDING_PROMOS_KEY)||'[]'))}catch{return new Set()}}
+function setPendingPromoIds(set){localStorage.setItem(CLOUD_PENDING_PROMOS_KEY,JSON.stringify([...set]));renderCloudPanel()}
+function markPromoPending(id){const q=getPendingPromoIds();q.add(id);setPendingPromoIds(q)}
+function clearPromoPending(id){const q=getPendingPromoIds();q.delete(id);setPendingPromoIds(q)}
+function localPromoById(id){return db.bundlePromos.find(p=>p.id===id)||db.promos.find(p=>p.id===id)||null}
+function promoKindFor(p){return db.bundlePromos.some(x=>x.id===p.id)?'bundle':'gift'}
 function getPendingPromoDeleteIds(){
   try{return new Set(JSON.parse(localStorage.getItem(CLOUD_PENDING_PROMO_DELETES_KEY)||'[]'))}
   catch{return new Set()}
@@ -1693,6 +1722,7 @@ async function deletePromotion(id,kind){
 
   if(!confirm('Delete this promotion permanently?'))return;
 
+  clearPromoPending(id);
   queuePromoDeleteForCloud(id);
 
   if(isBundle)db.bundlePromos=db.bundlePromos.filter(x=>x.id!==id);
@@ -1716,61 +1746,53 @@ async function deletePromotion(id,kind){
   }
 }
 
+async function upsertPromotionToCloud(p,kind){
+  const row={local_id:p.id,name:cloudPromotionName(p,kind),promo_type:kind,promo_kind:kind,payload:p,active:p.active!==false,updated_at:nowISO()};
+  const {error}=await sb.from('promotions').upsert(row,{onConflict:'local_id'});
+  if(error)throw error;
+  return true;
+}
+async function syncPendingPromotions(showToast=true){
+  if(!cloudSession||!sb){if(showToast)openCloudLogin();return false}
+  if(!navigator.onLine){if(showToast)toast('Offline — promo changes queued');return false}
+  const pending=getPendingPromoIds();
+  if(!pending.size)return true;
+  setCloudStatus('Cloud: syncing promos','syncing');
+  let failed=[];
+  for(const id of [...pending]){
+    const p=localPromoById(id);
+    if(!p){pending.delete(id);continue}
+    try{await upsertPromotionToCloud(p,promoKindFor(p));pending.delete(id);setPendingPromoIds(pending)}
+    catch(err){console.error('Promo sync failed',err);failed.push(`${id}: ${formatCloudError(err)}`)}
+  }
+  setPendingPromoIds(pending);
+  if(failed.length){setCloudStatus('Cloud: promo sync pending','warn');renderCloudPanel(`Promo changes pending: ${failed.slice(0,3).join(' · ')}`);if(showToast)toast('Some promo changes are still pending');return false}
+  setCloudStatus('Cloud: synced','on');if(showToast)toast('Promotion synced');return true;
+}
 async function syncPromotionsToCloud(){
   if(!cloudSession||!sb||!navigator.onLine)return false;
-  const rows=[];
-  for(const p of db.bundlePromos||[])rows.push({
-    local_id:p.id,
-    name:cloudPromotionName(p,'bundle'),
-    promo_type:'bundle',
-    promo_kind:'bundle',
-    payload:p,
-    active:p.active!==false,
-    updated_at:nowISO()
-  });
-  for(const p of db.promos||[])rows.push({
-    local_id:p.id,
-    name:cloudPromotionName(p,'gift'),
-    promo_type:'gift',
-    promo_kind:'gift',
-    payload:p,
-    active:p.active!==false,
-    updated_at:nowISO()
-  });
-  if(!rows.length)return true;
-  const {error}=await sb.from('promotions').upsert(rows,{onConflict:'local_id'});
-  if(error)throw error;
+  for(const p of db.bundlePromos||[])await upsertPromotionToCloud(p,'bundle');
+  for(const p of db.promos||[])await upsertPromotionToCloud(p,'gift');
   return true;
 }
 async function pullCloudPromotions(){
   if(!cloudSession||!sb||!navigator.onLine)return false;
-
   const {data,error}=await sb.from('promotions').select('local_id,promo_type,promo_kind,payload,active,updated_at');
   if(error)throw error;
-
-  const pending=getPendingPromoDeleteIds();
-  const rows=(data||[]).filter(r=>!pending.has(r.local_id));
-
-  // Keep one row per local_id if the database ever contains duplicates.
+  const pendingDeletes=getPendingPromoDeleteIds(),pendingChanges=getPendingPromoIds();
+  const rows=(data||[]).filter(r=>!pendingDeletes.has(r.local_id));
   const byLocal=new Map();
-  for(const r of rows){
-    const old=byLocal.get(r.local_id);
-    if(!old||String(r.updated_at||'')>=String(old.updated_at||''))byLocal.set(r.local_id,r);
-  }
-  const clean=[...byLocal.values()];
-
-  db.bundlePromos=clean
-    .filter(r=>(r.promo_type||r.promo_kind)==='bundle'&&r.payload)
-    .map(r=>({...r.payload,id:r.local_id,active:r.active!==false}));
-
-  db.promos=clean
-    .filter(r=>(r.promo_type||r.promo_kind)==='gift'&&r.payload)
-    .map(r=>({...r.payload,id:r.local_id,active:r.active!==false}));
-
-  persistLocal();
-  renderPromos();
-  renderCart();
-  return true;
+  for(const r of rows){const old=byLocal.get(r.local_id);if(!old||String(r.updated_at||'')>=String(old.updated_at||''))byLocal.set(r.local_id,r)}
+  const cloud=[...byLocal.values()];
+  const cloudBundles=cloud.filter(r=>(r.promo_type||r.promo_kind)==='bundle'&&r.payload).map(r=>({...r.payload,id:r.local_id,active:r.active!==false}));
+  const cloudGifts=cloud.filter(r=>(r.promo_type||r.promo_kind)==='gift'&&r.payload).map(r=>({...r.payload,id:r.local_id,active:r.active!==false}));
+  const mergedBundles=new Map(cloudBundles.map(p=>[p.id,p]));
+  for(const p of db.bundlePromos.filter(p=>pendingChanges.has(p.id)))mergedBundles.set(p.id,p);
+  const mergedGifts=new Map(cloudGifts.map(p=>[p.id,p]));
+  for(const p of db.promos.filter(p=>pendingChanges.has(p.id)))mergedGifts.set(p.id,p);
+  db.bundlePromos=[...mergedBundles.values()];
+  db.promos=[...mergedGifts.values()];
+  persistLocal();renderPromos();renderCart();return true;
 }
 
 async function syncAllToCloud(){
@@ -1923,7 +1945,7 @@ async function syncCloudWorkspace(){
   await syncPendingEvents(false);
   await pullCloudEvents({showToast:false});
 
-  try{await syncPendingPromotionDeletes(false);await syncPromotionsToCloud();await pullCloudPromotions()}catch(e){console.warn('Promotion cloud sync skipped',e)}
+  try{await syncPendingPromotionDeletes(false);await syncPendingPromotions(false);await syncPromotionsToCloud();await pullCloudPromotions()}catch(e){console.warn('Promotion cloud sync skipped',e)}
   await syncPendingDeletes(false);
   await syncPendingVoids(false);
   await syncPendingSales(false);
@@ -2084,6 +2106,7 @@ async function refreshCloudAfterFocus(){
     await syncPendingDeletes(false);
     await syncPendingEventDeletes(false);
     await syncPendingPromotionDeletes(false);
+    await syncPendingPromotions(false);
     await syncPendingEvents(false);
     await syncPendingVoids(false);
     await syncPendingSales(false);
@@ -2110,6 +2133,7 @@ function startCloudWorkspacePoller(){
       await syncPendingDeletes(false);
     await syncPendingEventDeletes(false);
     await syncPendingPromotionDeletes(false);
+    await syncPendingPromotions(false);
     await syncPendingEvents(false);
       await syncPendingVoids(false);
       await syncPendingSales(false);

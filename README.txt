@@ -922,3 +922,22 @@ If the transaction fails, none of those database changes are committed.
 
 For inventory safety, deleting a closed event now requires an internet/cloud connection.
 After deletion, the app immediately pulls Master Stock from cloud so the restored units are visible.
+
+
+V8.6.9 — MASTER STOCK ADJUSTMENT CANCEL FIX
+-------------------------------------------
+No Supabase SQL changes are required.
+
+FIXED
+-----
+The Cancel button in Master Stock Adjustment previously behaved like a form submit.
+Because Adjustment and Reason are required, the browser blocked Cancel and showed
+"Please fill out this field".
+
+V8.6.9:
+- Cancel is explicitly type="button"
+- Save is explicitly type="submit"
+- Cancel closes immediately without validating fields
+- clicking outside the dialog closes it
+- Escape/native dialog cancel closes it
+- pointer handling is included for iPad Safari

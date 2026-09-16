@@ -10,11 +10,11 @@
   <title>HeyNikko POS</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
-  <link rel="stylesheet" href="styles.css?v=8.6.8">
+  <link rel="stylesheet" href="styles.css?v=8.6.9">
 </head>
 <body>
 <header>
-  <div><strong>☀️ HeyNikko POS</strong><span id="appVersion" class="version-badge">V8.6.8</span><span id="offlineBadge">Offline ready</span><span id="cloudBadge" class="cloud-badge cloud-off">Cloud: signed out</span><button id="cloudAccountBtn" class="cloud-account-btn" type="button">Sign in</button></div>
+  <div><strong>☀️ HeyNikko POS</strong><span id="appVersion" class="version-badge">V8.6.9</span><span id="offlineBadge">Offline ready</span><span id="cloudBadge" class="cloud-badge cloud-off">Cloud: signed out</span><button id="cloudAccountBtn" class="cloud-account-btn" type="button">Sign in</button></div>
   <nav>
     <button class="tab active" data-view="pos">POS</button>
     <button class="tab" data-view="events">Events</button>
@@ -144,7 +144,7 @@
 <dialog id="stockDialog"><form method="dialog" id="stockForm">
   <h3>Master Stock Adjustment</h3><input type="hidden" id="stockProductId"><p id="stockProductName"></p>
   <label>Adjustment<input id="stockDelta" type="number" step="1" required placeholder="e.g. 100 or -2"></label><label>Reason<input id="stockReason" required placeholder="New stock received, damaged, sample…"></label>
-  <menu><button value="cancel" class="ghost">Cancel</button><button value="default" class="primary">Save</button></menu>
+  <menu><button type="button" id="cancelStockAdjustment" class="ghost">Cancel</button><button type="submit" class="primary">Save</button></menu>
 </form></dialog>
 
 <dialog id="eventDialog" class="wide-dialog"><form method="dialog" id="eventForm">
@@ -201,7 +201,7 @@
         try{await load(src);break}catch(e){window.__supabaseLoadError=e.message}
       }
     }
-    const a=document.createElement('script');a.src='app.js?v=8.6.8';a.defer=false;document.body.appendChild(a);
+    const a=document.createElement('script');a.src='app.js?v=8.6.9';a.defer=false;document.body.appendChild(a);
   }
   boot();
 })();

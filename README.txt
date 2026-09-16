@@ -1084,3 +1084,27 @@ Event left: 7
 
 Remove -> 7 returns to Master Stock.
 The 3 sold units remain in Sales History.
+
+
+V8.7.6 — NEW CATEGORIES SHOW IN MAIN POS
+----------------------------------------
+No Supabase SQL changes are required.
+
+FIXED
+-----
+Custom categories created from Master Stock > Add/Edit Product now appear as
+category buttons in the main POS.
+
+The bug was that the Product editor used the dynamic category list, while the main
+POS category buttons still used only the original fixed categories.
+
+V8.7.6 now uses the same dynamic allCategories() source for:
+- Main POS category buttons
+- Product category dropdown
+- Promotion category choices
+- Create Event category filter
+- Current Event category filter
+
+Example:
+If you add "Sticker Pack" or "Big Stickers", those buttons will appear beside the
+existing POS categories after the product is saved/synced.

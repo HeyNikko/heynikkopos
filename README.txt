@@ -823,3 +823,47 @@ Eligible category checkboxes are now displayed as clear rows:
 [checkbox] Lifestyle
 
 The checkbox is directly beside its category label to avoid ambiguity.
+
+
+V8.6.6 — PROMO CURRENCY + PRIORITY FIX
+-------------------------------------
+No Supabase SQL changes are required.
+
+PROMO ENTRY
+-----------
+SGD Bundle Price and TWD Bundle Price are now both optional.
+At least ONE currency price must be entered.
+
+Examples:
+- SGD-only promo: 3 for S$15
+- TWD-only promo: 3 for NT$400
+- Both currencies: SGD 3 for S$15 + TWD 3 for NT$400
+
+The promo applies only in currencies where a direct promo price exists.
+
+PROMO LIST
+----------
+The Offer column now shows only currencies actually configured:
+SGD · 3 for S$15
+TWD · 3 for NT$400
+
+No "TWD not active" clutter is shown.
+
+OVERLAPPING PROMOS
+------------------
+When multiple active promos apply to the same products/categories, the POS now
+sorts eligible promos by the best effective price per unit for the CURRENT event
+currency.
+
+Example:
+Keychain TWD promos:
+- 3 for NT$450
+- 3 for NT$400
+
+For 3 keychains, POS chooses 3 for NT$400.
+
+PRODUCT PRICE SYNC
+------------------
+Saving an edited product now immediately pushes the pending product update to cloud
+when online, then refreshes product data back into POS. This helps a new TWD price
+such as NT$150 appear in the active Taiwan POS without waiting for the background cycle.

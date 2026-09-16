@@ -57,7 +57,61 @@ const nowISO=()=>new Date().toISOString();const uid=p=>p+Date.now().toString(36)
 function productImageHtml(p,cls='product-thumb'){return p?.image?`<img class="${cls}" src="${p.image}" alt="${esc(p.name)}">`:`<div class="${cls} image-placeholder">☀️</div>`}
 function availableStock(id,eventId=db.currentEventId){const e=eventById(eventId);return e&&e.status==='open'?+(e.stock[id]||0):+(prod(id)?.stock||0)}
 function calcPromoItems(baseItems,stockAllowance={}){const gifts=[];for(const pr of db.promos.filter(x=>x.active)){const q=baseItems.filter(i=>i.productId===pr.buy).reduce((a,b)=>a+b.qty,0),count=Math.floor(q/pr.buyQty);if(!count)continue;const gp=prod(pr.gift);if(!gp)continue;const wanted=count*pr.giftQty,already=gifts.filter(g=>g.productId===pr.gift).reduce((a,b)=>a+b.qty,0),manualNeeded=baseItems.filter(i=>i.productId===pr.gift).reduce((a,b)=>a+b.qty,0),available=Math.max(0,(stockAllowance[gp.id]??availableStock(gp.id))-manualNeeded-already),qty=Math.min(wanted,available);if(qty>0)gifts.push({id:uid('c'),productId:pr.gift,qty,promo:true,promoId:pr.id})}return gifts}
-function calcBundlePricing(baseItems,e=currentEvent()){const subtotal=baseItems.reduce((sum,i)=>sum+eventUnitPrice(prod(i.productId),e)*i.qty,0),remaining=baseItems.map(i=>({productId:i.productId,qty:i.qty})),applied=[];let discount=0;for(const pr of db.bundlePromos.filter(x=>x.active)){if(!bundlePromoAvailableForEvent(pr,e))continue;const eligible=remaining.reduce((n,i)=>n+(bundleEligibleProduct(pr,prod(i.productId))?i.qty:0),0),bundles=Math.floor(eligible/pr.qty);if(!bundles)continue;let need=bundles*pr.qty,normalValue=0;for(const row of remaining){if(need<=0)break;const p=prod(row.productId);if(!p||!bundleEligibleProduct(pr,p)||row.qty<=0)continue;const take=Math.min(row.qty,need);normalValue+=take*eventUnitPrice(p,e);row.qty-=take;need-=take}const localBundlePrice=bundlePriceForEvent(pr,e),bundleTotal=bundles*localBundlePrice,d=Math.max(0,normalValue-bundleTotal);discount+=d;const target=bundleTargetLabel(pr);applied.push({promoId:pr.id,categories:[...(pr.categories||[])],productIds:[...(pr.productIds||[])],bundleQty:pr.qty,bundlePrice:localBundlePrice,baseBundlePrice:pr.bundlePrice,bundles,normalValue,discount:d,label:`${target} · ${pr.qty} for ${eventMoney(localBundlePrice,e)}`})}return{subtotal,discount,total:Math.max(0,subtotal-discount),applied}}
+function calcBundlePricing(baseItems,e=currentEvent()){
+  const subtotal=baseItems.reduce((sum,i)=>sum+eventUnitPrice(prod(i.productId),e)*i.qty,0),
+    remaining=baseItems.map(i=>({productId:i.productId,qty:i.qty})),applied=[];
+  let discount=0;
+
+  // Only promos configured for this event currency can participate.
+  // Sort by effective price per unit so overlapping promos use the best customer price,
+  // rather than whichever promo happened to be created first.
+  const promos=db.bundlePromos
+    .filter(pr=>pr.active&&bundlePromoAvailableForEvent(pr,e))
+    .map((pr,index)=>({pr,index,localPrice:bundlePriceForEvent(pr,e)}))
+    .sort((a,b)=>{
+      const aUnit=a.localPrice/Math.max(1,Number(a.pr.qty)||1),
+        bUnit=b.localPrice/Math.max(1,Number(b.pr.qty)||1);
+      if(aUnit!==bUnit)return aUnit-bUnit;
+      if(Number(a.pr.qty)!==Number(b.pr.qty))return Number(b.pr.qty)-Number(a.pr.qty);
+      return b.index-a.index;
+    });
+
+  for(const entry of promos){
+    const pr=entry.pr,localBundlePrice=entry.localPrice,
+      eligible=remaining.reduce((n,i)=>n+(bundleEligibleProduct(pr,prod(i.productId))?i.qty:0),0),
+      bundles=Math.floor(eligible/pr.qty);
+    if(!bundles)continue;
+
+    let need=bundles*pr.qty,normalValue=0;
+    for(const row of remaining){
+      if(need<=0)break;
+      const p=prod(row.productId);
+      if(!p||!bundleEligibleProduct(pr,p)||row.qty<=0)continue;
+      const take=Math.min(row.qty,need);
+      normalValue+=take*eventUnitPrice(p,e);
+      row.qty-=take;
+      need-=take;
+    }
+
+    const bundleTotal=bundles*localBundlePrice,d=Math.max(0,normalValue-bundleTotal);
+    discount+=d;
+    const target=bundleTargetLabel(pr);
+    applied.push({
+      promoId:pr.id,
+      categories:[...(pr.categories||[])],
+      productIds:[...(pr.productIds||[])],
+      bundleQty:pr.qty,
+      bundlePrice:localBundlePrice,
+      baseBundlePrice:pr.bundlePrice,
+      twdBundlePrice:pr.twdBundlePrice||0,
+      sourceCurrency:eventCurrency(e),
+      bundles,normalValue,discount:d,
+      label:`${target} · ${pr.qty} for ${eventMoney(localBundlePrice,e)}`
+    });
+  }
+
+  return{subtotal,discount,total:Math.max(0,subtotal-discount),applied};
+}
 function recalcPromos(){const base=manualCart();db.cart=[...base,...calcPromoItems(base)];save();renderCart()}
 function addToCart(id){const e=currentEvent();if(!e)return toast('Create or select an open event first');const p=prod(id),stock=availableStock(id);if(!p||stock<=0)return toast('Out of event stock');let row=db.cart.find(i=>!i.promo&&i.productId===id),cur=row?.qty||0;if(cur>=stock)return toast('Not enough event stock');if(row)row.qty++;else db.cart.push({id:uid('c'),productId:id,qty:1,promo:false});recalcPromos()}
 function changeQty(id,d){const r=db.cart.find(i=>i.id===id);if(!r||r.promo)return;const max=availableStock(r.productId);r.qty=Math.max(0,Math.min(max,r.qty+d));if(!r.qty)db.cart=db.cart.filter(x=>x.id!==id);recalcPromos()}
@@ -151,7 +205,12 @@ function setImagePreview(src=''){
 function openProduct(id=''){const p=id?prod(id):null;$('#productDialogTitle').textContent=p?'Edit Product':'Add Product';$('#productId').value=p?.id||'';$('#productSku').value=p?.sku||'';$('#productName').value=p?.name||'';$('#productCategory').value=p?.category||'';$('#productPrice').value=p?.price??'';$('#productTwdPrice').value=Number(p?.twdPrice)>0?p.twdPrice:'';$('#productStock').value=p?.stock??0;$('#productLow').value=p?.low??5;$('#productImage').value='';setImagePreview(p?.image||'');$('#productDialog').showModal()}
 function resizeImage(file,max=700,quality=.78){return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onerror=reject;reader.onload=()=>{const img=new Image();img.onerror=reject;img.onload=()=>{let w=img.width,h=img.height;if(Math.max(w,h)>max){const r=max/Math.max(w,h);w=Math.round(w*r);h=Math.round(h*r)}const c=document.createElement('canvas');c.width=w;c.height=h;const ctx=c.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);ctx.drawImage(img,0,0,w,h);resolve(c.toDataURL('image/jpeg',quality))};img.src=reader.result};reader.readAsDataURL(file)})}
 async function handleProductImage(e){const f=e.target.files?.[0];if(!f)return;if(!f.type.startsWith('image/'))return toast('Please choose an image');try{setImagePreview(await resizeImage(f));toast('Image ready')}catch{toast('Could not process image')}}
-function saveProductForm(e){e.preventDefault();const id=$('#productId').value,sku=$('#productSku').value.trim();if(db.products.some(p=>p.sku.toLowerCase()===sku.toLowerCase()&&p.id!==id))return toast('SKU already exists');const data={sku,name:$('#productName').value.trim(),category:$('#productCategory').value,price:+$('#productPrice').value,twdPrice:Math.max(0,+$('#productTwdPrice').value||0),stock:+$('#productStock').value,low:+$('#productLow').value,image:pendingProductImage};if(id){const p=prod(id),old=p.stock;Object.assign(p,data);if(old!==p.stock)db.movements.push({id:uid('m'),createdAt:nowISO(),productId:p.id,sku:p.sku,name:p.name,delta:p.stock-old,scope:'master',eventId:'',eventName:'',reason:'Master stock edited',receipt:''})}else{const p={id:uid('p'),...data};db.products.push(p);if(p.stock)db.movements.push({id:uid('m'),createdAt:nowISO(),productId:p.id,sku:p.sku,name:p.name,delta:p.stock,scope:'master',eventId:'',eventName:'',reason:'Opening master stock',receipt:''})}save();$('#productDialog').close();renderAll();toast('Product saved')}
+function saveProductForm(e){e.preventDefault();const id=$('#productId').value,sku=$('#productSku').value.trim();if(db.products.some(p=>p.sku.toLowerCase()===sku.toLowerCase()&&p.id!==id))return toast('SKU already exists');const data={sku,name:$('#productName').value.trim(),category:$('#productCategory').value,price:+$('#productPrice').value,twdPrice:Math.max(0,+$('#productTwdPrice').value||0),stock:+$('#productStock').value,low:+$('#productLow').value,image:pendingProductImage};if(id){const p=prod(id),old=p.stock;Object.assign(p,data);if(old!==p.stock)db.movements.push({id:uid('m'),createdAt:nowISO(),productId:p.id,sku:p.sku,name:p.name,delta:p.stock-old,scope:'master',eventId:'',eventName:'',reason:'Master stock edited',receipt:''})}else{const p={id:uid('p'),...data};db.products.push(p);if(p.stock)db.movements.push({id:uid('m'),createdAt:nowISO(),productId:p.id,sku:p.sku,name:p.name,delta:p.stock,scope:'master',eventId:'',eventName:'',reason:'Opening master stock',receipt:''})}save();$('#productDialog').close();renderAll();toast('Product saved');
+if(cloudSession&&sb&&navigator.onLine){
+  syncPendingProducts(false).then(ok=>{
+    if(ok)return pullCloudProducts({auto:true,silent:true});
+  }).then(()=>renderAll()).catch(err=>console.warn('Immediate product price sync pending',err));
+}}
 function openStock(id){const p=prod(id);$('#stockProductId').value=id;$('#stockProductName').textContent=`${p.name} · Master available ${p.stock}`;$('#stockDelta').value='';$('#stockReason').value='';$('#stockDialog').showModal()}
 function saveStockForm(e){e.preventDefault();const p=prod($('#stockProductId').value),d=+$('#stockDelta').value;if(!p||!d)return toast('Enter a non-zero adjustment');if(p.stock+d<0)return toast('Master stock cannot go below zero');p.stock+=d;db.movements.push({id:uid('m'),createdAt:nowISO(),productId:p.id,sku:p.sku,name:p.name,delta:d,scope:'master',eventId:'',eventName:'',reason:$('#stockReason').value.trim(),receipt:''});save();$('#stockDialog').close();renderAll();toast('Master stock updated')}
 function fmtDate(s){if(!s)return'';const d=new Date(s+'T00:00:00');return d.toLocaleDateString('en-SG',{day:'numeric',month:'short',year:'numeric'})}
@@ -380,14 +439,14 @@ function viewClosedEvent(id){const e=eventById(id);if(!e)return;const lines=db.p
 function promoOptions(){const o=db.products.map(p=>`<option value="${p.id}">${esc(p.name)} (${esc(p.sku)})</option>`).join('');$('#promoBuy').innerHTML=o;$('#promoGift').innerHTML=o;$('#editAddProduct').innerHTML='<option value="">Select product…</option>'+o}
 function bundlePriceForEvent(pr,e=currentEvent()){
   const code=eventCurrency(e);
-
   if(code==='TWD'){
     const direct=Number(pr.twdBundlePrice);
     return Number.isFinite(direct)&&direct>0?roundEventPrice(direct,e):null;
   }
-
-  if(code==='SGD')return Number(pr.bundlePrice)||0;
-
+  if(code==='SGD'){
+    const direct=Number(pr.bundlePrice);
+    return Number.isFinite(direct)&&direct>0?direct:null;
+  }
   return null;
 }
 function bundlePromoAvailableForEvent(pr,e=currentEvent()){
@@ -398,10 +457,10 @@ function bundleTargetLabel(pr){if(pr.targetType==='products'||(pr.productIds&&pr
 function renderPromoProductChecks(){const box=$('#promoProductChecks');if(!box)return;const q=($('#promoProductSearch')?.value||'').trim().toLowerCase(),selected=new Set($$('#promoProductChecks input:checked').map(x=>x.value)),rows=db.products.filter(p=>(p.name+' '+p.sku+' '+p.category).toLowerCase().includes(q));box.innerHTML=rows.map(p=>`<label class="promo-product-option"><input type="checkbox" value="${p.id}" ${selected.has(p.id)?'checked':''}><span class="promo-product-meta"><strong>${esc(p.name)}</strong><small>${esc(p.sku)} · ${esc(p.category||'Uncategorised')} · ${money(p.price)}</small></span></label>`).join('')||'<p class="muted" style="padding:12px">No matching products.</p>';$$('#promoProductChecks input').forEach(x=>x.onchange=updatePromoProductCount);updatePromoProductCount()}
 function updatePromoProductCount(){const el=$('#promoProductCount');if(el)el.textContent=`${$$('#promoProductChecks input:checked').length} selected`}
 function toggleBundleTargetFields(){const byProducts=$('#bundleTargetType')?.value==='products';$('#bundleCategoryTarget').hidden=byProducts;$('#bundleProductTarget').hidden=!byProducts;if(byProducts)renderPromoProductChecks()}
-function renderPromos(){$('#promosTable').innerHTML=[...db.bundlePromos.map(pr=>`<tr><td>Bundle price</td><td>${esc(bundleTargetLabel(pr))}</td><td>${pr.qty} for ${money(pr.bundlePrice)}${Number(pr.twdBundlePrice)>0?`<div class="muted">${pr.qty} for ${moneyCurrency(pr.twdBundlePrice,'TWD')}</div>`:'<div class="muted">TWD: not active</div>'}</td><td>${pr.active?'Active':'Disabled'}</td><td><div class="action-row"><button class="ghost" data-toggle-bundle="${pr.id}">${pr.active?'Disable':'Enable'}</button><button class="ghost" data-delete-bundle="${pr.id}">Delete</button></div></td></tr>`),...db.promos.map(pr=>{const b=prod(pr.buy),g=prod(pr.gift);return`<tr><td>Free gift</td><td>${esc(b?.name||'Missing product')} × ${pr.buyQty}</td><td>${esc(g?.name||'Missing product')} × ${pr.giftQty} free</td><td>${pr.active?'Active':'Disabled'}</td><td><div class="action-row"><button class="ghost" data-toggle-promo="${pr.id}">${pr.active?'Disable':'Enable'}</button><button class="ghost" data-delete-promo="${pr.id}">Delete</button></div></td></tr>`})].join('')||'<tr><td colspan="5" class="muted">No promotions.</td></tr>';$$('[data-toggle-bundle]').forEach(b=>b.onclick=()=>{const p=db.bundlePromos.find(x=>x.id===b.dataset.toggleBundle);p.active=!p.active;save();renderAll()});$$('[data-delete-bundle]').forEach(b=>b.onclick=()=>{db.bundlePromos=db.bundlePromos.filter(x=>x.id!==b.dataset.deleteBundle);save();renderAll()});$$('[data-toggle-promo]').forEach(b=>b.onclick=()=>{const p=db.promos.find(x=>x.id===b.dataset.togglePromo);p.active=!p.active;save();recalcPromos();renderAll()});$$('[data-delete-promo]').forEach(b=>b.onclick=()=>{db.promos=db.promos.filter(x=>x.id!==b.dataset.deletePromo);save();recalcPromos();renderAll()})}
+function renderPromos(){$('#promosTable').innerHTML=[...db.bundlePromos.map(pr=>`<tr><td>Bundle price</td><td>${esc(bundleTargetLabel(pr))}</td><td>${Number(pr.bundlePrice)>0?`<div><span class="currency-pill">SGD</span> ${pr.qty} for ${money(pr.bundlePrice)}</div>`:''}${Number(pr.twdBundlePrice)>0?`<div><span class="currency-pill">TWD</span> ${pr.qty} for ${moneyCurrency(pr.twdBundlePrice,'TWD')}</div>`:''}</td><td>${pr.active?'Active':'Disabled'}</td><td><div class="action-row"><button class="ghost" data-toggle-bundle="${pr.id}">${pr.active?'Disable':'Enable'}</button><button class="ghost" data-delete-bundle="${pr.id}">Delete</button></div></td></tr>`),...db.promos.map(pr=>{const b=prod(pr.buy),g=prod(pr.gift);return`<tr><td>Free gift</td><td>${esc(b?.name||'Missing product')} × ${pr.buyQty}</td><td>${esc(g?.name||'Missing product')} × ${pr.giftQty} free</td><td>${pr.active?'Active':'Disabled'}</td><td><div class="action-row"><button class="ghost" data-toggle-promo="${pr.id}">${pr.active?'Disable':'Enable'}</button><button class="ghost" data-delete-promo="${pr.id}">Delete</button></div></td></tr>`})].join('')||'<tr><td colspan="5" class="muted">No promotions.</td></tr>';$$('[data-toggle-bundle]').forEach(b=>b.onclick=()=>{const p=db.bundlePromos.find(x=>x.id===b.dataset.toggleBundle);p.active=!p.active;save();renderAll()});$$('[data-delete-bundle]').forEach(b=>b.onclick=()=>{db.bundlePromos=db.bundlePromos.filter(x=>x.id!==b.dataset.deleteBundle);save();renderAll()});$$('[data-toggle-promo]').forEach(b=>b.onclick=()=>{const p=db.promos.find(x=>x.id===b.dataset.togglePromo);p.active=!p.active;save();recalcPromos();renderAll()});$$('[data-delete-promo]').forEach(b=>b.onclick=()=>{db.promos=db.promos.filter(x=>x.id!==b.dataset.deletePromo);save();recalcPromos();renderAll()})}
 function togglePromoFields(){const gift=$('#promoType').value==='gift';$('#giftPromoFields').hidden=!gift;$('#bundlePromoFields').hidden=gift;if(!gift)toggleBundleTargetFields()}
-function openPromo(){promoOptions();$('#promoType').value='bundle';$('#bundleTargetType').value='categories';togglePromoFields();$$('#promoCategoryChecks input').forEach(x=>x.checked=false);$('#promoProductSearch').value='';renderPromoProductChecks();$$('#promoProductChecks input').forEach(x=>x.checked=false);updatePromoProductCount();$('#bundleQty').value=5;$('#bundlePrice').value=10;$('#bundleTwdPrice').value='';$('#promoDialog').showModal()}
-function savePromoForm(e){e.preventDefault();if($('#promoType').value==='bundle'){const targetType=$('#bundleTargetType').value,categories=$$('#promoCategoryChecks input:checked').map(x=>x.value),productIds=$$('#promoProductChecks input:checked').map(x=>x.value),qty=+$('#bundleQty').value,bundlePrice=+$('#bundlePrice').value,twdBundlePrice=Math.max(0,+$('#bundleTwdPrice').value||0);if(targetType==='products'&&!productIds.length)return toast('Choose at least one product');if(targetType==='categories'&&!categories.length)return toast('Choose at least one category');if(!qty||qty<1)return toast('Bundle quantity must be at least 1');db.bundlePromos.push({id:uid('bp'),type:'bundle',targetType,categories:targetType==='categories'?categories:[],productIds:targetType==='products'?productIds:[],qty,bundlePrice,twdBundlePrice,active:true})}else db.promos.push({id:uid('pr'),type:'gift',buy:$('#promoBuy').value,buyQty:+$('#promoBuyQty').value,gift:$('#promoGift').value,giftQty:+$('#promoGiftQty').value,active:true});save();$('#promoDialog').close();recalcPromos();renderAll();toast('Promotion saved')}
+function openPromo(){promoOptions();$('#promoType').value='bundle';$('#bundleTargetType').value='categories';togglePromoFields();$$('#promoCategoryChecks input').forEach(x=>x.checked=false);$('#promoProductSearch').value='';renderPromoProductChecks();$$('#promoProductChecks input').forEach(x=>x.checked=false);updatePromoProductCount();$('#bundleQty').value=5;$('#bundlePrice').value='';$('#bundleTwdPrice').value='';$('#promoDialog').showModal()}
+function savePromoForm(e){e.preventDefault();if($('#promoType').value==='bundle'){const targetType=$('#bundleTargetType').value,categories=$$('#promoCategoryChecks input:checked').map(x=>x.value),productIds=$$('#promoProductChecks input:checked').map(x=>x.value),qty=+$('#bundleQty').value,bundlePrice=Math.max(0,+$('#bundlePrice').value||0),twdBundlePrice=Math.max(0,+$('#bundleTwdPrice').value||0);if(targetType==='products'&&!productIds.length)return toast('Choose at least one product');if(targetType==='categories'&&!categories.length)return toast('Choose at least one category');if(!qty||qty<1)return toast('Bundle quantity must be at least 1');if(bundlePrice<=0&&twdBundlePrice<=0)return toast('Enter at least one promo price: SGD or TWD');db.bundlePromos.push({id:uid('bp'),type:'bundle',targetType,categories:targetType==='categories'?categories:[],productIds:targetType==='products'?productIds:[],qty,bundlePrice,twdBundlePrice,active:true})}else db.promos.push({id:uid('pr'),type:'gift',buy:$('#promoBuy').value,buyQty:+$('#promoBuyQty').value,gift:$('#promoGift').value,giftQty:+$('#promoGiftQty').value,active:true});save();$('#promoDialog').close();recalcPromos();renderAll();toast('Promotion saved')}
 function updateSalesBulkControls(){selectedSaleIds=new Set([...selectedSaleIds].filter(id=>db.sales.some(s=>s.id===id)));const n=selectedSaleIds.size,count=$('#salesSelectedCount'),del=$('#deleteSelectedSales'),head=$('#salesHeaderCheck');if(count)count.textContent=`${n} selected`;if(del)del.disabled=!n;if(head){head.checked=db.sales.length>0&&n===db.sales.length;head.indeterminate=n>0&&n<db.sales.length}}
 function localDateInputValue(d){
   const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');
@@ -1415,7 +1474,7 @@ async function pullCloudEvents(options={}){
 }
 
 
-function cloudPromotionName(p,kind){if(kind==='bundle'){let target;if(p.targetType==='products'||(p.productIds&&p.productIds.length)){const ps=(p.productIds||[]).map(id=>prod(id)).filter(Boolean);target=ps.length?`${ps.slice(0,2).map(x=>x.name).join(' + ')}${ps.length>2?` + ${ps.length-2} more`:''}`:'Selected products'}else target=(p.categories||[]).join(' + ')||'Selected categories';return `${target} · ${Number(p.qty)||0} for ${money(Number(p.bundlePrice)||0)}${Number(p.twdBundlePrice)>0?` / ${moneyCurrency(Number(p.twdBundlePrice),'TWD')}`:''}`}const buy=prod(p.buy),gift=prod(p.gift),buyName=buy?.name||buy?.sku||'Product',giftName=gift?.name||gift?.sku||'Gift';return `Buy ${Number(p.buyQty)||0} ${buyName} · Get ${Number(p.giftQty)||0} ${giftName} free`}
+function cloudPromotionName(p,kind){if(kind==='bundle'){let target;if(p.targetType==='products'||(p.productIds&&p.productIds.length)){const ps=(p.productIds||[]).map(id=>prod(id)).filter(Boolean);target=ps.length?`${ps.slice(0,2).map(x=>x.name).join(' + ')}${ps.length>2?` + ${ps.length-2} more`:''}`:'Selected products'}else target=(p.categories||[]).join(' + ')||'Selected categories';return `${target} · ${Number(p.qty)||0} · ${Number(p.bundlePrice)>0?`SGD ${money(Number(p.bundlePrice))}`:''}${Number(p.bundlePrice)>0&&Number(p.twdBundlePrice)>0?' / ':''}${Number(p.twdBundlePrice)>0?`TWD ${moneyCurrency(Number(p.twdBundlePrice),'TWD')}`:''}`}const buy=prod(p.buy),gift=prod(p.gift),buyName=buy?.name||buy?.sku||'Product',giftName=gift?.name||gift?.sku||'Gift';return `Buy ${Number(p.buyQty)||0} ${buyName} · Get ${Number(p.giftQty)||0} ${giftName} free`}
 async function syncPromotionsToCloud(){
   if(!cloudSession||!sb||!navigator.onLine)return false;
   const rows=[];

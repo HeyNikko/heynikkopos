@@ -970,3 +970,27 @@ filters/dropdowns on the other device after product sync.
 
 Default categories remain:
 Stickers, Sticker Sheets, Keychain, Postcard, Lifestyle.
+
+
+V8.7.1 — CLOUD PROMOTION DELETE FIX
+-----------------------------------
+No Supabase SQL changes are required.
+
+ROOT CAUSE
+----------
+Promo Delete previously removed the promotion only from local browser data.
+The Supabase promotions row remained, so a later cloud pull downloaded it again.
+
+FIX
+---
+- Bundle Promo Delete now deletes the matching Supabase promotions row.
+- Free Gift Promo Delete does the same.
+- Offline deletes are queued.
+- Pending promo deletes are suppressed during cloud pulls, so a deleted promo cannot
+  reappear while waiting for internet.
+- Background/focus sync retries pending promo deletes automatically.
+- Cloud promotion pull now clears local promos correctly when cloud has none.
+- Cloud pull also de-duplicates identical local_id rows defensively.
+
+After installing V8.7.1, delete the unwanted duplicate promos once more.
+They should remain deleted on both PC and iPad.

@@ -664,3 +664,27 @@ Currency is stored on each Event, not on the device. Master product prices remai
 POS product prices, cart totals, bundle promotion prices, receipts, event revenue and Sales history use the Event/Sale currency. Sales permanently store their currency and exchange rate. Mixed-currency Sales date ranges show separate totals instead of adding SGD and TWD together.
 
 Inventory quantities, Event Stock, Master Stock, voids, event close, event delete, product IDs and existing Realtime/cloud sync logic are unchanged. Existing cloud records default to SGD / rate 1. The system does not require a live FX API, so booth checkout continues to work offline.
+
+
+V8.6.1 — USE MASTER QTY WHEN CREATING EVENT
+-------------------------------------------
+No Supabase SQL changes are required.
+
+Create Event now has:
+- Select All Visible
+- Use Master Qty
+- Clear Visible
+- Import CSV
+
+Use Master Qty fills the event quantity for every SELECTED product currently visible
+under the active Search / Category filter using that product's current Master Stock.
+
+Example:
+Cap Black · Master 20
+Cap Cream · Master 15
+
+Tick both products → Use Master Qty
+Event quantities become 20 and 15.
+
+You can still manually change any quantity before creating the event.
+V8.6 currency settings and all existing cloud sync behaviour are unchanged.

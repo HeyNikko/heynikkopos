@@ -653,3 +653,14 @@ V8.5.6:
 - tapping the dark backdrop closes the dialog
 - Escape / native dialog cancel still closes on desktop
 - added pointer handling for iPad Safari backdrop taps
+
+
+V8.6 — EVENT-BASED MULTI-CURRENCY
+---------------------------------
+Run SUPABASE_V8_6_SETUP.sql once before using this build.
+
+Currency is stored on each Event, not on the device. Master product prices remain SGD. Singapore events use SGD / rate 1. Taiwan events can use TWD with a manually chosen selling exchange rate and optional rounding to nearest 1, 5 or 10.
+
+POS product prices, cart totals, bundle promotion prices, receipts, event revenue and Sales history use the Event/Sale currency. Sales permanently store their currency and exchange rate. Mixed-currency Sales date ranges show separate totals instead of adding SGD and TWD together.
+
+Inventory quantities, Event Stock, Master Stock, voids, event close, event delete, product IDs and existing Realtime/cloud sync logic are unchanged. Existing cloud records default to SGD / rate 1. The system does not require a live FX API, so booth checkout continues to work offline.

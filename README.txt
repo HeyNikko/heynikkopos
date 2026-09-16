@@ -755,3 +755,29 @@ Fallback FX: 1 SGD = 25 TWD
 
 Taiwan POS = NT$180
 NOT NT$148 / FX fallback.
+
+
+V8.6.4 — CUSTOM TWD PROMOTION PRICES
+------------------------------------
+No Supabase SQL changes are required.
+
+Bundle promotions now support:
+- SGD Bundle Price
+- TWD Bundle Price
+
+Singapore events use the SGD bundle price.
+Taiwan events use the TWD bundle price directly when it is set.
+
+Example:
+Product TWD price: NT$180
+TWD promo: 3 for NT$450
+
+3 items subtotal = NT$540
+Promotion total = NT$450
+Discount = NT$90
+
+If a TWD Bundle Price is blank, the existing Event fallback exchange rate is used
+so older promotions remain compatible.
+
+Promotion cloud sync requires no schema change because promotions are already
+stored in the existing JSON payload.

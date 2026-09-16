@@ -1004,3 +1004,30 @@ New promos are now protected by a Pending Promos queue until Supabase confirms t
 Cloud pulls preserve pending local promos instead of overwriting them.
 Save Promo pushes immediately when online, and background/focus sync retries pending
 promo uploads. V8.7.1 permanent promo deletion remains included.
+
+
+V8.7.3 — EDIT EXISTING PROMOTIONS
+---------------------------------
+No Supabase SQL changes are required.
+
+Every promotion now has:
+- Edit
+- Disable / Enable
+- Delete
+
+Edit uses the same promotion form and updates the EXISTING promo ID.
+
+Bundle promo fields that can be edited:
+- Applies to: categories or selected products
+- Eligible categories / selected products
+- Bundle quantity
+- SGD Bundle Price
+- TWD Bundle Price
+
+Free Gift promo fields can also be edited.
+
+Cloud behavior:
+- the existing promo local_id is preserved
+- edits enter the Pending Promos queue
+- the existing Supabase row is updated, not duplicated
+- V8.7.1 permanent deletion and V8.7.2 promo sync protection remain included

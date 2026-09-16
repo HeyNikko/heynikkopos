@@ -688,3 +688,43 @@ Event quantities become 20 and 15.
 
 You can still manually change any quantity before creating the event.
 V8.6 currency settings and all existing cloud sync behaviour are unchanged.
+
+
+V8.6.2 — CUSTOM TWD PRODUCT PRICES
+----------------------------------
+Run SUPABASE_V8_6_2_SETUP.sql once before using this build.
+
+PRICING MODEL
+-------------
+Every product can now store:
+- SGD Price (existing base price)
+- TWD Price (new optional direct selling price)
+
+For an SGD event:
+- POS uses SGD Price.
+
+For a TWD event:
+1. If TWD Price is set (> 0), POS uses that exact TWD Price.
+2. If TWD Price is blank / 0, POS falls back to:
+   SGD Price × Event fallback exchange rate.
+3. Event price rounding is then applied if configured.
+
+Example:
+Product SGD price: S$5.90
+Product TWD price: NT$180
+Taiwan Event fallback rate: 1 SGD = 25 TWD
+
+POS price = NT$180, NOT NT$147.50.
+The exchange rate is ignored for this product because it has a direct TWD price.
+
+This lets Taiwan pricing follow local market strategy instead of pure FX conversion.
+
+MASTER STOCK
+------------
+Master Stock now shows both SGD and TWD prices for each product.
+Inventory quantities and stock movement logic are unchanged.
+
+CLOUD SAFETY
+------------
+Only one optional products.twd_price column is added.
+No Event, Sales, Event Inventory, void, close, delete, Realtime, or stock logic is changed.

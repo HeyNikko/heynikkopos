@@ -1192,3 +1192,25 @@ PHP · Philippine Peso
 
 Existing SGD and TWD product prices, promos, events, sales, inventory and cloud sync
 are unchanged.
+
+
+V8.8.1 — CATEGORY AUTO-SYNC RESET FIX
+-------------------------------------
+No Supabase SQL changes are required.
+
+ROOT CAUSE
+----------
+Automatic product sync can rebuild the Category <select> while Edit Product is open.
+Rebuilding the options resets a browser select to its first option, which appears as
+"Select category...".
+
+FIX
+---
+- Category refresh now detects which product is currently being edited.
+- The edited product's saved category is restored after every options rebuild.
+- Custom categories are inserted into the select if necessary.
+- Product cloud refresh can safely rebuild category UI without clearing the selection.
+- openProduct now sets productId before rebuilding category options, so the correct
+  saved category is known immediately.
+
+This does not change stock, prices, events, sales, promos, or Supabase schema.

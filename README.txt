@@ -1131,3 +1131,64 @@ then Keychain, Postcard, Lifestyle, followed by other categories.
 
 Any future custom category containing the word "Sticker" is also kept with the
 sticker group automatically.
+
+
+V8.7.8 — PROMO PERSISTENCE / MULTI-DEVICE SYNC FIX
+--------------------------------------------------
+No Supabase SQL changes are required.
+
+ROOT CAUSE
+----------
+V8.7.7 still contained an older background step that uploaded the ENTIRE local promo
+list from whichever device was syncing. With PC + iPad, a device holding an older
+local promo snapshot could write stale promo state back to cloud.
+
+A second race was also possible: after a new promo successfully uploaded, its pending
+flag was cleared immediately. A very fast cloud refresh could arrive before the new
+promo row was observed back from Supabase and temporarily remove it locally.
+
+V8.7.8 FIX
+----------
+- Promotions now use change-only sync.
+- Background sync NEVER uploads the whole local promo list.
+- Only newly added / edited / enabled / disabled promos in Pending Promos are written.
+- A newly saved promo is protected for up to 5 minutes or until Supabase returns its ID.
+- Cloud pulls preserve pending/protected promos.
+- Once the promo is confirmed back from cloud, protection is removed automatically.
+- Permanent cloud-delete behavior remains unchanged.
+
+This specifically protects promos created on iPad from disappearing during PC/iPad
+background sync.
+
+
+V8.8.0 — PHILIPPINE PESO / MANILA EVENT PRICING
+-------------------------------------------------
+Requires SUPABASE_V8_8_0_PHP_PRICE_SETUP.sql to be run once.
+
+NEW CURRENCY
+------------
+PHP · Philippine Peso (₱) is now supported as a direct event currency.
+
+PRODUCT PRICING
+---------------
+Master Stock > Add/Edit Product now includes:
+- SGD Price
+- TWD Price
+- PHP Price
+
+For a PHP event, the POS uses php_price directly when it is set.
+If PHP Price is blank, the event fallback exchange rate can still be used.
+
+PROMOTIONS
+----------
+Bundle promos now support independent SGD, TWD and PHP bundle prices.
+The Promos screen includes a PHP filter.
+A PHP event only applies bundle promos that have a PHP Bundle Price.
+
+EVENTS
+------
+Create/Edit Event now includes:
+PHP · Philippine Peso
+
+Existing SGD and TWD product prices, promos, events, sales, inventory and cloud sync
+are unchanged.

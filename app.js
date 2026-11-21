@@ -9,6 +9,7 @@ const CLOUD_PENDING_DELETES_KEY='heynikko_pos_v8_pending_deletes';
 const CLOUD_PENDING_EVENT_DELETES_KEY='heynikko_pos_v8_pending_event_deletes';
 const CLOUD_PENDING_PROMO_DELETES_KEY='heynikko_pos_v8_pending_promo_deletes';
 const CLOUD_PENDING_PROMOS_KEY='heynikko_pos_v8_pending_promos';
+const CLOUD_PROMO_PROTECTED_KEY='heynikko_pos_v8_protected_promos';
 const CLOUD_PENDING_EVENTS_KEY='heynikko_pos_v8_pending_events';
 
 const CATEGORIES=['Stickers','Sticker Sheets','Keychain','Postcard','Lifestyle'];
@@ -79,7 +80,7 @@ let db=load(),pendingProductImage='',editSaleDraft=[],selectedSaleIds=new Set(),
 function load(){try{const raw=JSON.parse(localStorage.getItem(KEY)||'{}'),d={...structuredClone(seed),...raw};d.products=(d.products||[]).map(p=>({...p,image:p.image||'',category:p.category||'',stock:+p.stock||0}));d.promos=(d.promos||[]).map(p=>({...p,type:'gift'}));d.bundlePromos=Array.isArray(raw.bundlePromos)?raw.bundlePromos:structuredClone(DEFAULT_BUNDLES);d.sales=(d.sales||[]).map(s=>({...s,status:s.status||'active',subtotal:s.subtotal??s.total,bundleDiscount:s.bundleDiscount||0,bundlePromos:s.bundlePromos||[],eventId:s.eventId||'',eventName:s.eventName||'',currencyCode:s.currencyCode||'SGD',exchangeRate:Number(s.exchangeRate)||1}));d.movements=d.movements||[];d.cart=d.cart||[];d.events=(d.events||[]).map(e=>{const x={...e,status:e.status||'open',stock:e.stock||{},opening:e.opening||{},added:e.added||{},returned:e.returned||{},activeProducts:e.activeProducts||{},createdAt:e.createdAt||new Date().toISOString(),currencyCode:e.currencyCode||'SGD',exchangeRate:Number(e.exchangeRate)||1,priceRounding:Number(e.priceRounding)||0};if(!Object.keys(x.activeProducts).length){for(const id of new Set([...Object.keys(x.stock),...Object.keys(x.opening),...Object.keys(x.added)]))x.activeProducts[id]=true}return x});d.currentEventId=d.currentEventId||'';return d}catch{return structuredClone(seed)}}
 function persistLocal(){try{localStorage.setItem(KEY,JSON.stringify(db))}catch(e){toast('Storage is full. Export a backup and use smaller images.');throw e}}function save(){persistLocal();try{captureChangedProducts()}catch(e){console.warn('Cloud product change capture skipped',e)}try{captureChangedEvents();scheduleCloudEventSync()}catch(e){console.warn('Cloud event change capture skipped',e)}try{scheduleCloudSaleSync()}catch(e){console.warn('Cloud sale sync schedule skipped',e)}}
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];const money=n=>new Intl.NumberFormat('en-SG',{style:'currency',currency:'SGD'}).format(Number(n)||0);
-const CURRENCY_META={SGD:{symbol:'S$',digits:2,name:'Singapore Dollar'},TWD:{symbol:'NT$',digits:0,name:'New Taiwan Dollar'}};
+const CURRENCY_META={SGD:{symbol:'S$',digits:2,name:'Singapore Dollar'},TWD:{symbol:'NT$',digits:0,name:'New Taiwan Dollar'},PHP:{symbol:'₱',digits:0,name:'Philippine Peso'}};
 function currencyMeta(code){return CURRENCY_META[code]||{symbol:`${code||'SGD'} `,digits:2,name:code||'Currency'}}
 function eventCurrency(e){return e?.currencyCode||'SGD'}
 function eventExchangeRate(e){const n=Number(e?.exchangeRate);return Number.isFinite(n)&&n>0?n:1}
@@ -95,6 +96,10 @@ function eventUnitPrice(product,e){
     const twd=Number(product.twdPrice);
     if(Number.isFinite(twd)&&twd>0)return roundEventPrice(twd,e);
   }
+  if(code==='PHP'){
+    const php=Number(product.phpPrice);
+    if(Number.isFinite(php)&&php>0)return roundEventPrice(php,e);
+  }
 
   // SGD stays on the catalogue's base SGD price.
   if(code==='SGD')return roundEventPrice(Number(product.price)||0,e);
@@ -106,6 +111,7 @@ function productHasDirectEventPrice(product,e){
   if(!product)return false;
   if(eventCurrency(e)==='SGD')return true;
   if(eventCurrency(e)==='TWD')return Number(product.twdPrice)>0;
+  if(eventCurrency(e)==='PHP')return Number(product.phpPrice)>0;
   return false;
 }
 function moneyCurrency(v,code){const m=currencyMeta(code),n=Number(v)||0;return `${m.symbol}${n.toLocaleString('en-SG',{minimumFractionDigits:m.digits,maximumFractionDigits:m.digits})}`}
@@ -176,7 +182,7 @@ function addToCart(id){const e=currentEvent();if(!e)return toast('Create or sele
 function changeQty(id,d){const r=db.cart.find(i=>i.id===id);if(!r||r.promo)return;const max=availableStock(r.productId);r.qty=Math.max(0,Math.min(max,r.qty+d));if(!r.qty)db.cart=db.cart.filter(x=>x.id!==id);recalcPromos()}
 function renderCategoryOptions(){const cats=allCategories();const opts='<option value="">Select category…</option>'+cats.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');$('#productCategory').innerHTML=opts;$('#categoryFilter').innerHTML='<option value="">All categories</option>'+cats.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');$('#promoCategoryChecks').innerHTML=cats.map(c=>`<label class="category-check"><input type="checkbox" value="${esc(c)}"><span>${esc(c)}</span></label>`).join('');if(posCategoryState&&!cats.includes(posCategoryState))posCategoryState='';$('#categoryFilter').value=posCategoryState;renderPosCategoryButtons()}
 function renderEventBanner(){const e=currentEvent();$('#eventBanner').innerHTML=e?`<div><strong>📍 ${esc(e.name)}</strong><span>${fmtDate(e.start)}${e.end&&e.end!==e.start?' – '+fmtDate(e.end):''} · ${eventCurrency(e)}</span></div><button class="ghost" data-goto-events>Manage Event</button>`:`<div><strong>No active event selected</strong><span>Create an event and allocate stock before taking booth sales.</span></div><button class="primary" data-create-event>+ Create Event</button>`;const ce=$('[data-create-event]');if(ce)ce.onclick=openCreateEvent;const ge=$('[data-goto-events]');if(ge)ge.onclick=()=>switchView('events')}
-function renderProducts(){const q=($('#search')?.value||'').toLowerCase(),cat=posCategoryState||'',e=currentEvent();const cf=$('#categoryFilter');if(cf&&cf.value!==cat)cf.value=cat;const list=db.products.filter(p=>(!e||e.activeProducts?.[p.id]||(Number(e.stock?.[p.id])||0)>0)&&(!cat||p.category===cat)&&(p.name+' '+p.sku+' '+p.category).toLowerCase().includes(q));$('#productGrid').innerHTML=list.map(p=>{const stock=e?availableStock(p.id):0;return`<button class="product-card" data-add="${p.id}" ${!e||stock<=0?'disabled':''}>${productImageHtml(p,'product-card-image')}<div class="product-card-info"><strong>${esc(p.name)}</strong><div><span class="category-pill">${esc(p.category||'Uncategorised')}</span></div><div class="sku">${esc(p.sku)}</div><div class="price">${eventMoney(eventUnitPrice(p,e),e)}${eventCurrency(e)==='TWD'?`<div class="muted">${productHasDirectEventPrice(p,e)?'TWD direct price':'FX fallback'}</div>`:''}</div><div class="${stock<=p.low?'stock-low':'muted'}">Event stock: ${stock}</div></div></button>`}).join('')||'<p class="muted">No products found.</p>';$$('[data-add]').forEach(b=>b.onclick=()=>addToCart(b.dataset.add))}
+function renderProducts(){const q=($('#search')?.value||'').toLowerCase(),cat=posCategoryState||'',e=currentEvent();const cf=$('#categoryFilter');if(cf&&cf.value!==cat)cf.value=cat;const list=db.products.filter(p=>(!e||e.activeProducts?.[p.id]||(Number(e.stock?.[p.id])||0)>0)&&(!cat||p.category===cat)&&(p.name+' '+p.sku+' '+p.category).toLowerCase().includes(q));$('#productGrid').innerHTML=list.map(p=>{const stock=e?availableStock(p.id):0;return`<button class="product-card" data-add="${p.id}" ${!e||stock<=0?'disabled':''}>${productImageHtml(p,'product-card-image')}<div class="product-card-info"><strong>${esc(p.name)}</strong><div><span class="category-pill">${esc(p.category||'Uncategorised')}</span></div><div class="sku">${esc(p.sku)}</div><div class="price">${eventMoney(eventUnitPrice(p,e),e)}${eventCurrency(e)!=='SGD'?`<div class="muted">${productHasDirectEventPrice(p,e)?`${eventCurrency(e)} direct price`:'FX fallback'}</div>`:''}</div><div class="${stock<=p.low?'stock-low':'muted'}">Event stock: ${stock}</div></div></button>`}).join('')||'<p class="muted">No products found.</p>';$$('[data-add]').forEach(b=>b.onclick=()=>addToCart(b.dataset.add))}
 function renderCart(){const e=currentEvent();$('#cart').innerHTML=db.cart.length?db.cart.map(r=>{const p=prod(r.productId);if(!p)return'';return`<div class="cart-row"><div class="cart-product">${productImageHtml(p,'cart-thumb')}<div><strong>${esc(p.name)}</strong> ${r.promo?'<span class="promo-pill">FREE PROMO</span>':''}<div class="muted">${esc(p.sku)} · ${r.promo?eventMoney(0,e):eventMoney(eventUnitPrice(p,e),e)}</div></div></div><div class="qty">${r.promo?`× ${r.qty}`:`<button class="ghost" data-minus="${r.id}">−</button><strong>${r.qty}</strong><button class="ghost" data-plus="${r.id}">+</button>`}</div></div>`}).join(''):'<p class="muted">Tap a product to start an order.</p>';const pricing=calcBundlePricing(manualCart(),e),lines=pricing.applied.filter(a=>a.discount>0).map(a=>`<div class="bundle-line"><span>${esc(a.label)} × ${a.bundles}</span><strong>−${eventMoney(a.discount,e)}</strong></div>`).join('');$('#bundleDiscounts').innerHTML=lines;$('#subtotalRow').style.display=pricing.discount>0?'flex':'none';$('#subtotal').textContent=eventMoney(pricing.subtotal,e);$('#total').textContent=eventMoney(pricing.total,e);$$('[data-minus]').forEach(b=>b.onclick=()=>changeQty(b.dataset.minus,-1));$$('[data-plus]').forEach(b=>b.onclick=()=>changeQty(b.dataset.plus,1))}
 async function checkout(method){
   const e=currentEvent();
@@ -245,7 +251,7 @@ function renderProductTable(){
     <td>${esc(p.sku)}</td>
     <td>${esc(p.name)}</td>
     <td>${esc(p.category||'—')}</td>
-    <td><strong>${money(p.price)}</strong><div class="muted">${Number(p.twdPrice)>0?moneyCurrency(p.twdPrice,'TWD'):'TWD not set'}</div></td>
+    <td><strong>${money(p.price)}</strong><div class="muted">${Number(p.twdPrice)>0?moneyCurrency(p.twdPrice,'TWD'):'TWD not set'}</div><div class="muted">${Number(p.phpPrice)>0?moneyCurrency(p.phpPrice,'PHP'):'PHP not set'}</div></td>
     <td class="${p.stock<=p.low?'stock-low':''}">${p.stock}</td>
     <td>${p.low}</td>
     <td><div class="action-row">
@@ -284,10 +290,10 @@ function bindProductDialogDismiss(){
   d.addEventListener('click',closeFromBackdrop);
   d.addEventListener('pointerup',closeFromBackdrop);
 }
-function openProduct(id=''){bindProductDialogDismiss();renderCategoryOptions();const p=id?prod(id):null;$('#productDialogTitle').textContent=p?'Edit Product':'Add Product';$('#productId').value=p?.id||'';$('#productSku').value=p?.sku||'';$('#productName').value=p?.name||'';$('#productCategory').value=p?.category||'';$('#productPrice').value=p?.price??'';$('#productTwdPrice').value=Number(p?.twdPrice)>0?p.twdPrice:'';$('#productStock').value=p?.stock??0;$('#productLow').value=p?.low??5;$('#productImage').value='';setImagePreview(p?.image||'');$('#productDialog').showModal()}
+function openProduct(id=''){bindProductDialogDismiss();renderCategoryOptions();const p=id?prod(id):null;$('#productDialogTitle').textContent=p?'Edit Product':'Add Product';$('#productId').value=p?.id||'';$('#productSku').value=p?.sku||'';$('#productName').value=p?.name||'';$('#productCategory').value=p?.category||'';$('#productPrice').value=p?.price??'';$('#productTwdPrice').value=Number(p?.twdPrice)>0?p.twdPrice:'';$('#productPhpPrice').value=Number(p?.phpPrice)>0?p.phpPrice:'';$('#productStock').value=p?.stock??0;$('#productLow').value=p?.low??5;$('#productImage').value='';setImagePreview(p?.image||'');$('#productDialog').showModal()}
 function resizeImage(file,max=700,quality=.78){return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onerror=reject;reader.onload=()=>{const img=new Image();img.onerror=reject;img.onload=()=>{let w=img.width,h=img.height;if(Math.max(w,h)>max){const r=max/Math.max(w,h);w=Math.round(w*r);h=Math.round(h*r)}const c=document.createElement('canvas');c.width=w;c.height=h;const ctx=c.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);ctx.drawImage(img,0,0,w,h);resolve(c.toDataURL('image/jpeg',quality))};img.src=reader.result};reader.readAsDataURL(file)})}
 async function handleProductImage(e){const f=e.target.files?.[0];if(!f)return;if(!f.type.startsWith('image/'))return toast('Please choose an image');try{setImagePreview(await resizeImage(f));toast('Image ready')}catch{toast('Could not process image')}}
-function saveProductForm(e){e.preventDefault();const id=$('#productId').value,sku=$('#productSku').value.trim();if(db.products.some(p=>p.sku.toLowerCase()===sku.toLowerCase()&&p.id!==id))return toast('SKU already exists');const data={sku,name:$('#productName').value.trim(),category:$('#productCategory').value,price:+$('#productPrice').value,twdPrice:Math.max(0,+$('#productTwdPrice').value||0),stock:+$('#productStock').value,low:+$('#productLow').value,image:pendingProductImage};if(id){const p=prod(id),old=p.stock;Object.assign(p,data);if(old!==p.stock)db.movements.push({id:uid('m'),createdAt:nowISO(),productId:p.id,sku:p.sku,name:p.name,delta:p.stock-old,scope:'master',eventId:'',eventName:'',reason:'Master stock edited',receipt:''})}else{const p={id:uid('p'),...data};db.products.push(p);if(p.stock)db.movements.push({id:uid('m'),createdAt:nowISO(),productId:p.id,sku:p.sku,name:p.name,delta:p.stock,scope:'master',eventId:'',eventName:'',reason:'Opening master stock',receipt:''})}save();$('#productDialog').close();renderAll();toast('Product saved');
+function saveProductForm(e){e.preventDefault();const id=$('#productId').value,sku=$('#productSku').value.trim();if(db.products.some(p=>p.sku.toLowerCase()===sku.toLowerCase()&&p.id!==id))return toast('SKU already exists');const data={sku,name:$('#productName').value.trim(),category:$('#productCategory').value,price:+$('#productPrice').value,twdPrice:Math.max(0,+$('#productTwdPrice').value||0),phpPrice:Math.max(0,+$('#productPhpPrice').value||0),stock:+$('#productStock').value,low:+$('#productLow').value,image:pendingProductImage};if(id){const p=prod(id),old=p.stock;Object.assign(p,data);if(old!==p.stock)db.movements.push({id:uid('m'),createdAt:nowISO(),productId:p.id,sku:p.sku,name:p.name,delta:p.stock-old,scope:'master',eventId:'',eventName:'',reason:'Master stock edited',receipt:''})}else{const p={id:uid('p'),...data};db.products.push(p);if(p.stock)db.movements.push({id:uid('m'),createdAt:nowISO(),productId:p.id,sku:p.sku,name:p.name,delta:p.stock,scope:'master',eventId:'',eventName:'',reason:'Opening master stock',receipt:''})}save();$('#productDialog').close();renderAll();toast('Product saved');
 if(cloudSession&&sb&&navigator.onLine){
   syncPendingProducts(false).then(ok=>{
     if(ok)return pullCloudProducts({auto:true,silent:true});
@@ -807,6 +813,10 @@ function bundlePriceForEvent(pr,e=currentEvent()){
     const direct=Number(pr.twdBundlePrice);
     return Number.isFinite(direct)&&direct>0?roundEventPrice(direct,e):null;
   }
+  if(code==='PHP'){
+    const direct=Number(pr.phpBundlePrice);
+    return Number.isFinite(direct)&&direct>0?roundEventPrice(direct,e):null;
+  }
   if(code==='SGD'){
     const direct=Number(pr.bundlePrice);
     return Number.isFinite(direct)&&direct>0?direct:null;
@@ -826,12 +836,13 @@ function promoCurrencies(pr,kind){
   const out=[];
   if(Number(pr.bundlePrice)>0)out.push('SGD');
   if(Number(pr.twdBundlePrice)>0)out.push('TWD');
+  if(Number(pr.phpBundlePrice)>0)out.push('PHP');
   return out;
 }
 function ensurePromoCurrencyFilter(){
   if(promoCurrencyFilter)return promoCurrencyFilter;
   const c=eventCurrency(currentEvent());
-  promoCurrencyFilter=(c==='SGD'||c==='TWD')?c:'all';
+  promoCurrencyFilter=(c==='SGD'||c==='TWD'||c==='PHP')?c:'all';
   return promoCurrencyFilter;
 }
 function setPromoCurrencyFilter(v){
@@ -857,6 +868,7 @@ function promoOfferText(pr,kind,filter){
   const bits=[];
   if((filter==='all'||filter==='SGD')&&Number(pr.bundlePrice)>0)bits.push(`<div>${pr.qty} for ${money(pr.bundlePrice)}</div>`);
   if((filter==='all'||filter==='TWD')&&Number(pr.twdBundlePrice)>0)bits.push(`<div>${pr.qty} for ${moneyCurrency(pr.twdBundlePrice,'TWD')}</div>`);
+  if((filter==='all'||filter==='PHP')&&Number(pr.phpBundlePrice)>0)bits.push(`<div>${pr.qty} for ${moneyCurrency(pr.phpBundlePrice,'PHP')}</div>`);
   return bits.join('')||'<span class="muted">—</span>';
 }
 function renderPromos(){
@@ -936,6 +948,7 @@ function openPromo(){
   $('#bundleQty').value=5;
   $('#bundlePrice').value='';
   $('#bundleTwdPrice').value='';
+  $('#bundlePhpPrice').value='';
 
   $('#promoDialog').showModal();
 }
@@ -968,6 +981,7 @@ function openEditPromo(id,kind){
     $('#bundleQty').value=pr.qty||1;
     $('#bundlePrice').value=Number(pr.bundlePrice)>0?pr.bundlePrice:'';
     $('#bundleTwdPrice').value=Number(pr.twdBundlePrice)>0?pr.twdBundlePrice:'';
+    $('#bundlePhpPrice').value=Number(pr.phpBundlePrice)>0?pr.phpBundlePrice:'';
   }else{
     const pr=db.promos.find(x=>x.id===id);
     if(!pr)return toast('Promotion not found');
@@ -991,12 +1005,13 @@ async function savePromoForm(e){
       productIds=$$('#promoProductChecks input:checked').map(x=>x.value),
       qty=+$('#bundleQty').value,
       bundlePrice=Math.max(0,+$('#bundlePrice').value||0),
-      twdBundlePrice=Math.max(0,+$('#bundleTwdPrice').value||0);
+      twdBundlePrice=Math.max(0,+$('#bundleTwdPrice').value||0),
+      phpBundlePrice=Math.max(0,+$('#bundlePhpPrice').value||0);
 
     if(targetType==='products'&&!productIds.length)return toast('Choose at least one product');
     if(targetType==='categories'&&!categories.length)return toast('Choose at least one category');
     if(!qty||qty<1)return toast('Bundle quantity must be at least 1');
-    if(bundlePrice<=0&&twdBundlePrice<=0)return toast('Enter at least one promo price: SGD or TWD');
+    if(bundlePrice<=0&&twdBundlePrice<=0&&phpBundlePrice<=0)return toast('Enter at least one promo price: SGD, TWD or PHP');
 
     if(isEdit){
       promo=db.bundlePromos.find(x=>x.id===editingPromoId);
@@ -1007,12 +1022,13 @@ async function savePromoForm(e){
       promo.qty=qty;
       promo.bundlePrice=bundlePrice;
       promo.twdBundlePrice=twdBundlePrice;
+      promo.phpBundlePrice=phpBundlePrice;
     }else{
       promo={
         id:uid('bp'),type:'bundle',targetType,
         categories:targetType==='categories'?categories:[],
         productIds:targetType==='products'?productIds:[],
-        qty,bundlePrice,twdBundlePrice,active:true
+        qty,bundlePrice,twdBundlePrice,phpBundlePrice,active:true
       };
       db.bundlePromos.push(promo);
     }
@@ -1316,7 +1332,7 @@ async function deletePastEvent(id){
 
 function cloudImageKey(p){const x=p?.image||'';return x.startsWith('data:')?`${x.slice(0,48)}:${x.length}`:x}
 function cloudRowToLocalProduct(r,old=null){
-  return{id:old?.id||`cloud_${r.id}`,cloudId:r.id,sku:r.sku,name:r.name,category:r.category||'',price:Number(r.price)||0,twdPrice:Number(r.twd_price)||0,stock:Number(r.master_qty)||0,low:Number(r.low_stock_at)||0,image:r.image_url||'',active:r.active!==false};
+  return{id:old?.id||`cloud_${r.id}`,cloudId:r.id,sku:r.sku,name:r.name,category:r.category||'',price:Number(r.price)||0,twdPrice:Number(r.twd_price)||0,phpPrice:Number(r.php_price)||0,stock:Number(r.master_qty)||0,low:Number(r.low_stock_at)||0,image:r.image_url||'',active:r.active!==false};
 }
 function mergeCloudProductsSafely(rows,{preservePending=true}={}){
   const pending=getPendingProductIds(),oldBySku=new Map(db.products.map(p=>[String(p.sku).toLowerCase(),p])),remoteSkus=new Set(),merged=[];
@@ -1338,19 +1354,19 @@ function mergeCloudProductsSafely(rows,{preservePending=true}={}){
   for(const id of [...cloudProductSnapshot.keys()])if(!db.products.some(p=>p.id===id)&&!pending.has(id))cloudProductSnapshot.delete(id);
   persistLocal();window.__cloudProductCount=(rows||[]).length;renderCategoryOptions();renderAll();return true;
 }
-function cloudFingerprint(p){return JSON.stringify([p.sku||'',p.name||'',p.category||'',Number(p.price)||0,Number(p.twdPrice)||0,Number(p.stock)||0,Number(p.low)||0,cloudImageKey(p),p.active!==false])}
+function cloudFingerprint(p){return JSON.stringify([p.sku||'',p.name||'',p.category||'',Number(p.price)||0,Number(p.twdPrice)||0,Number(p.phpPrice)||0,Number(p.stock)||0,Number(p.low)||0,cloudImageKey(p),p.active!==false])}
 function resetProductCloudSnapshot(){cloudProductSnapshot=new Map(db.products.map(p=>[p.id,cloudFingerprint(p)]))}
 function getPendingProductIds(){try{return new Set(JSON.parse(localStorage.getItem(CLOUD_PENDING_KEY)||'[]'))}catch{return new Set()}}
 function setPendingProductIds(set){localStorage.setItem(CLOUD_PENDING_KEY,JSON.stringify([...set]))}
 function captureChangedProducts(){if(!cloudProductSnapshot.size){resetProductCloudSnapshot();return}const pending=getPendingProductIds();for(const p of db.products){const fp=cloudFingerprint(p),old=cloudProductSnapshot.get(p.id);if(old!==undefined&&old!==fp)pending.add(p.id);if(old===undefined)pending.add(p.id)}setPendingProductIds(pending);renderCloudPanel();scheduleCloudProductSync()}
 function scheduleCloudProductSync(){if(cloudSyncTimer)clearTimeout(cloudSyncTimer);if(!navigator.onLine||!cloudSession||!sb)return;cloudSyncTimer=setTimeout(()=>syncPendingProducts(false),1000)}
 function setCloudStatus(text,state='off'){const b=$('#cloudBadge');if(b){b.textContent=text;b.className=`cloud-badge cloud-${state}`}const p=$('#cloudPanelStatus');if(p){p.textContent=text.replace('Cloud: ','');p.className=`status-pill cloud-panel-${state}`}}
-function renderCloudPanel(extra=''){const stats=$('#cloudSyncStats');if(stats){const pending=getPendingProductIds().size;stats.innerHTML=`<span>Local products: <strong>${db.products.length}</strong></span><span>Cloud products: <strong id="cloudCountValue">${window.__cloudProductCount??'—'}</strong></span><span>Pending products: <strong>${pending}</strong></span><span>Pending sales: <strong>${getPendingSaleIds().size}</strong></span><span>Pending voids: <strong>${getPendingVoidIds().size}</strong></span><span>Pending deletes: <strong>${getPendingDeleteIds().size}</strong></span><span>Pending events: <strong>${getPendingEventIds().size}</strong></span><span>Pending event deletes: <strong>${getPendingEventDeleteIds().size}</strong></span><span>Pending promos: <strong>${getPendingPromoIds().size}</strong></span><span>Pending promo deletes: <strong>${getPendingPromoDeleteIds().size}</strong></span>`}const pr=$('#cloudProgress');if(pr&&extra)pr.textContent=extra;const account=$('#cloudAccountBtn');if(account)account.textContent=cloudSession?.user?.email||'Sign in'}
+function renderCloudPanel(extra=''){const stats=$('#cloudSyncStats');if(stats){const pending=getPendingProductIds().size;stats.innerHTML=`<span>Local products: <strong>${db.products.length}</strong></span><span>Cloud products: <strong id="cloudCountValue">${window.__cloudProductCount??'—'}</strong></span><span>Pending products: <strong>${pending}</strong></span><span>Pending sales: <strong>${getPendingSaleIds().size}</strong></span><span>Pending voids: <strong>${getPendingVoidIds().size}</strong></span><span>Pending deletes: <strong>${getPendingDeleteIds().size}</strong></span><span>Pending events: <strong>${getPendingEventIds().size}</strong></span><span>Pending event deletes: <strong>${getPendingEventDeleteIds().size}</strong></span><span>Pending promos: <strong>${getPendingPromoIds().size}</strong></span><span>Protected promos: <strong>${activeProtectedPromoIds().size}</strong></span><span>Pending promo deletes: <strong>${getPendingPromoDeleteIds().size}</strong></span>`}const pr=$('#cloudProgress');if(pr&&extra)pr.textContent=extra;const account=$('#cloudAccountBtn');if(account)account.textContent=cloudSession?.user?.email||'Sign in'}
 async function refreshCloudProductCount(){if(!sb||!cloudSession)return;const {count,error}=await sb.from('products').select('*',{count:'exact',head:true});if(!error){window.__cloudProductCount=count||0;renderCloudPanel()}}
 function safeFileName(s){return String(s||'product').replace(/[^a-z0-9_-]+/gi,'-').replace(/^-+|-+$/g,'').toLowerCase()||'product'}
 async function uploadCloudProductImage(p){const src=p.image||'';if(!src||!src.startsWith('data:'))return src||null;const res=await fetch(src);const blob=await res.blob();const ext=blob.type.includes('png')?'png':'jpg';const path=`products/${safeFileName(p.sku)}-${Date.now()}.${ext}`;const {error}=await sb.storage.from('product-images').upload(path,blob,{contentType:blob.type||'image/jpeg',upsert:true});if(error)throw error;const {data}=sb.storage.from('product-images').getPublicUrl(path);return data?.publicUrl||null}
 async function upsertProductToCloud(p){if(!sb||!cloudSession)throw new Error('Not signed in');const localImage=p.image||'',existingRemoteImage=localImage&&!localImage.startsWith('data:')?localImage:null;const payload={sku:p.sku,name:p.name,category:p.category||null,price:Number(p.price)||0,
-    twd_price:Number(p.twdPrice)||null,image_url:existingRemoteImage,master_qty:Math.max(0,Number(p.stock)||0),low_stock_at:Math.max(0,Number(p.low)||0),active:p.active!==false,updated_at:new Date().toISOString()};const {data,error}=await sb.from('products').upsert(payload,{onConflict:'sku'}).select('id,sku,image_url').single();if(error){const err=new Error(error.message||'Product upsert failed');err.code=error.code;err.details=error.details;err.hint=error.hint;err.stage='product';throw err}p.cloudId=data.id;let imageWarning='';if(localImage.startsWith('data:')){try{const imageUrl=await uploadCloudProductImage(p);if(imageUrl){const {error:imageUpdateError}=await sb.from('products').update({image_url:imageUrl,updated_at:new Date().toISOString()}).eq('id',data.id);if(imageUpdateError)throw imageUpdateError;p.image=imageUrl}}catch(imgErr){console.warn('Product migrated but image upload failed',p.sku,imgErr);imageWarning=imgErr?.message||String(imgErr)}}persistLocal();cloudProductSnapshot.set(p.id,cloudFingerprint(p));return{...data,imageWarning}}
+    twd_price:Number(p.twdPrice)||null,php_price:Number(p.phpPrice)||null,image_url:existingRemoteImage,master_qty:Math.max(0,Number(p.stock)||0),low_stock_at:Math.max(0,Number(p.low)||0),active:p.active!==false,updated_at:new Date().toISOString()};const {data,error}=await sb.from('products').upsert(payload,{onConflict:'sku'}).select('id,sku,image_url').single();if(error){const err=new Error(error.message||'Product upsert failed');err.code=error.code;err.details=error.details;err.hint=error.hint;err.stage='product';throw err}p.cloudId=data.id;let imageWarning='';if(localImage.startsWith('data:')){try{const imageUrl=await uploadCloudProductImage(p);if(imageUrl){const {error:imageUpdateError}=await sb.from('products').update({image_url:imageUrl,updated_at:new Date().toISOString()}).eq('id',data.id);if(imageUpdateError)throw imageUpdateError;p.image=imageUrl}}catch(imgErr){console.warn('Product migrated but image upload failed',p.sku,imgErr);imageWarning=imgErr?.message||String(imgErr)}}persistLocal();cloudProductSnapshot.set(p.id,cloudFingerprint(p));return{...data,imageWarning}}
 async function syncPendingProducts(showToast=true){
   if(!navigator.onLine){if(showToast)toast('Offline · product changes will sync later');return false}
   if(!cloudSession||!sb){if(showToast)openCloudLogin();return false}
@@ -1472,9 +1488,36 @@ function captureChangedEvents(){
 function markEventPending(id){
   const pending=getPendingEventIds();pending.add(id);setPendingEventIds(pending);
 }
+function getProtectedPromos(){
+  try{return JSON.parse(localStorage.getItem(CLOUD_PROMO_PROTECTED_KEY)||'{}')||{}}
+  catch{return{}}
+}
+function setProtectedPromos(map){
+  localStorage.setItem(CLOUD_PROMO_PROTECTED_KEY,JSON.stringify(map||{}));
+}
+function protectPromo(id,ms=300000){
+  const map=getProtectedPromos();
+  map[id]=Date.now()+ms;
+  setProtectedPromos(map);
+}
+function unprotectPromo(id){
+  const map=getProtectedPromos();
+  delete map[id];
+  setProtectedPromos(map);
+}
+function activeProtectedPromoIds(){
+  const now=Date.now(),map=getProtectedPromos(),set=new Set();
+  let changed=false;
+  for(const [id,until] of Object.entries(map)){
+    if(Number(until)>now)set.add(id);
+    else{delete map[id];changed=true}
+  }
+  if(changed)setProtectedPromos(map);
+  return set;
+}
 function getPendingPromoIds(){try{return new Set(JSON.parse(localStorage.getItem(CLOUD_PENDING_PROMOS_KEY)||'[]'))}catch{return new Set()}}
 function setPendingPromoIds(set){localStorage.setItem(CLOUD_PENDING_PROMOS_KEY,JSON.stringify([...set]));renderCloudPanel()}
-function markPromoPending(id){const q=getPendingPromoIds();q.add(id);setPendingPromoIds(q)}
+function markPromoPending(id){const q=getPendingPromoIds();q.add(id);setPendingPromoIds(q);protectPromo(id)}
 function clearPromoPending(id){const q=getPendingPromoIds();q.delete(id);setPendingPromoIds(q)}
 function localPromoById(id){return db.bundlePromos.find(p=>p.id===id)||db.promos.find(p=>p.id===id)||null}
 function promoKindFor(p){return db.bundlePromos.some(x=>x.id===p.id)?'bundle':'gift'}
@@ -2101,7 +2144,7 @@ async function pullCloudEvents(options={}){
 }
 
 
-function cloudPromotionName(p,kind){if(kind==='bundle'){let target;if(p.targetType==='products'||(p.productIds&&p.productIds.length)){const ps=(p.productIds||[]).map(id=>prod(id)).filter(Boolean);target=ps.length?`${ps.slice(0,2).map(x=>x.name).join(' + ')}${ps.length>2?` + ${ps.length-2} more`:''}`:'Selected products'}else target=(p.categories||[]).join(' + ')||'Selected categories';return `${target} · ${Number(p.qty)||0} · ${Number(p.bundlePrice)>0?`SGD ${money(Number(p.bundlePrice))}`:''}${Number(p.bundlePrice)>0&&Number(p.twdBundlePrice)>0?' / ':''}${Number(p.twdBundlePrice)>0?`TWD ${moneyCurrency(Number(p.twdBundlePrice),'TWD')}`:''}`}const buy=prod(p.buy),gift=prod(p.gift),buyName=buy?.name||buy?.sku||'Product',giftName=gift?.name||gift?.sku||'Gift';return `Buy ${Number(p.buyQty)||0} ${buyName} · Get ${Number(p.giftQty)||0} ${giftName} free`}
+function cloudPromotionName(p,kind){if(kind==='bundle'){let target;if(p.targetType==='products'||(p.productIds&&p.productIds.length)){const ps=(p.productIds||[]).map(id=>prod(id)).filter(Boolean);target=ps.length?`${ps.slice(0,2).map(x=>x.name).join(' + ')}${ps.length>2?` + ${ps.length-2} more`:''}`:'Selected products'}else target=(p.categories||[]).join(' + ')||'Selected categories';return `${target} · ${Number(p.qty)||0} · ${Number(p.bundlePrice)>0?`SGD ${money(Number(p.bundlePrice))}`:''}${Number(p.bundlePrice)>0&&Number(p.twdBundlePrice)>0?' / ':''}${Number(p.twdBundlePrice)>0?`TWD ${moneyCurrency(Number(p.twdBundlePrice),'TWD')}`:''}${Number(p.phpBundlePrice)>0?`${(Number(p.bundlePrice)>0||Number(p.twdBundlePrice)>0)?' / ':''}PHP ${moneyCurrency(Number(p.phpBundlePrice),'PHP')}`:''}`}const buy=prod(p.buy),gift=prod(p.gift),buyName=buy?.name||buy?.sku||'Product',giftName=gift?.name||gift?.sku||'Gift';return `Buy ${Number(p.buyQty)||0} ${buyName} · Get ${Number(p.giftQty)||0} ${giftName} free`}
 async function deletePromotionFromCloud(localId){
   if(!cloudSession||!sb||!navigator.onLine)return false;
   const {error}=await sb.from('promotions').delete().eq('local_id',localId);
@@ -2198,7 +2241,7 @@ async function syncPendingPromotions(showToast=true){
   for(const id of [...pending]){
     const p=localPromoById(id);
     if(!p){pending.delete(id);continue}
-    try{await upsertPromotionToCloud(p,promoKindFor(p));pending.delete(id);setPendingPromoIds(pending)}
+    try{await upsertPromotionToCloud(p,promoKindFor(p));protectPromo(id);pending.delete(id);setPendingPromoIds(pending)}
     catch(err){console.error('Promo sync failed',err);failed.push(`${id}: ${formatCloudError(err)}`)}
   }
   setPendingPromoIds(pending);
@@ -2206,26 +2249,41 @@ async function syncPendingPromotions(showToast=true){
   setCloudStatus('Cloud: synced','on');if(showToast)toast('Promotion synced');return true;
 }
 async function syncPromotionsToCloud(){
-  if(!cloudSession||!sb||!navigator.onLine)return false;
-  for(const p of db.bundlePromos||[])await upsertPromotionToCloud(p,'bundle');
-  for(const p of db.promos||[])await upsertPromotionToCloud(p,'gift');
-  return true;
+  // V8.7.8: never push the entire local promo list from a device.
+  // Only explicit pending changes are allowed to write to cloud.
+  return syncPendingPromotions(false);
 }
 async function pullCloudPromotions(){
   if(!cloudSession||!sb||!navigator.onLine)return false;
   const {data,error}=await sb.from('promotions').select('local_id,promo_type,promo_kind,payload,active,updated_at');
   if(error)throw error;
-  const pendingDeletes=getPendingPromoDeleteIds(),pendingChanges=getPendingPromoIds();
+
+  const pendingDeletes=getPendingPromoDeleteIds(),
+    pendingChanges=getPendingPromoIds(),
+    protectedIds=activeProtectedPromoIds();
+
   const rows=(data||[]).filter(r=>!pendingDeletes.has(r.local_id));
   const byLocal=new Map();
-  for(const r of rows){const old=byLocal.get(r.local_id);if(!old||String(r.updated_at||'')>=String(old.updated_at||''))byLocal.set(r.local_id,r)}
-  const cloud=[...byLocal.values()];
+  for(const r of rows){
+    const old=byLocal.get(r.local_id);
+    if(!old||String(r.updated_at||'')>=String(old.updated_at||''))byLocal.set(r.local_id,r);
+  }
+
+  const cloud=[...byLocal.values()],cloudIds=new Set(cloud.map(r=>r.local_id));
+
+  // Once cloud has actually returned the promo ID, protection can end.
+  for(const id of cloudIds)if(protectedIds.has(id))unprotectPromo(id);
+
   const cloudBundles=cloud.filter(r=>(r.promo_type||r.promo_kind)==='bundle'&&r.payload).map(r=>({...r.payload,id:r.local_id,active:r.active!==false}));
   const cloudGifts=cloud.filter(r=>(r.promo_type||r.promo_kind)==='gift'&&r.payload).map(r=>({...r.payload,id:r.local_id,active:r.active!==false}));
+
+  const keepIds=new Set([...pendingChanges,...activeProtectedPromoIds()]);
   const mergedBundles=new Map(cloudBundles.map(p=>[p.id,p]));
-  for(const p of db.bundlePromos.filter(p=>pendingChanges.has(p.id)))mergedBundles.set(p.id,p);
+  for(const p of db.bundlePromos)if(keepIds.has(p.id)&&!pendingDeletes.has(p.id))mergedBundles.set(p.id,p);
+
   const mergedGifts=new Map(cloudGifts.map(p=>[p.id,p]));
-  for(const p of db.promos.filter(p=>pendingChanges.has(p.id)))mergedGifts.set(p.id,p);
+  for(const p of db.promos)if(keepIds.has(p.id)&&!pendingDeletes.has(p.id))mergedGifts.set(p.id,p);
+
   db.bundlePromos=[...mergedBundles.values()];
   db.promos=[...mergedGifts.values()];
   persistLocal();renderPromos();renderCart();return true;
@@ -2281,7 +2339,7 @@ async function syncAllToCloud(){
 
   // PROMOTIONS
   try{
-    result.promotions.ok=await syncPromotionsToCloud();
+    result.promotions.ok=await syncPendingPromotions(false);
   }catch(e){
     result.promotions.error=formatCloudError(e);
   }
@@ -2381,7 +2439,7 @@ async function syncCloudWorkspace(){
   await syncPendingEvents(false);
   await pullCloudEvents({showToast:false});
 
-  try{await syncPendingPromotionDeletes(false);await syncPendingPromotions(false);await syncPromotionsToCloud();await pullCloudPromotions()}catch(e){console.warn('Promotion cloud sync skipped',e)}
+  try{await syncPendingPromotionDeletes(false);await syncPendingPromotions(false);await pullCloudPromotions()}catch(e){console.warn('Promotion cloud sync skipped',e)}
   await syncPendingDeletes(false);
   await syncPendingVoids(false);
   await syncPendingSales(false);
@@ -2389,7 +2447,7 @@ async function syncCloudWorkspace(){
   await refreshCurrentEventInventoryFromCloud();
 }
 
-async function fetchCloudProducts(){if(!cloudSession||!sb)throw new Error('Sign in first');const {data,error}=await sb.from('products').select('id,sku,name,category,price,image_url,master_qty,low_stock_at,active,updated_at,twd_price').order('name');if(error)throw error;return data||[]}
+async function fetchCloudProducts(){if(!cloudSession||!sb)throw new Error('Sign in first');const {data,error}=await sb.from('products').select('id,sku,name,category,price,image_url,master_qty,low_stock_at,active,updated_at,twd_price,php_price').order('name');if(error)throw error;return data||[]}
 async function pullCloudProducts(options={}){
   if(!cloudSession||!sb){if(options.silent)return false;openCloudLogin();return false}
   if(!navigator.onLine){if(options.silent)return false;toast('Internet connection required to pull cloud products');return false}

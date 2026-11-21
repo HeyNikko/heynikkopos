@@ -1214,3 +1214,25 @@ FIX
   saved category is known immediately.
 
 This does not change stock, prices, events, sales, promos, or Supabase schema.
+
+
+V8.8.2 — PROMO CHECKBOX AUTO-SYNC FIX
+-------------------------------------
+No Supabase SQL changes are required.
+
+ROOT CAUSE
+----------
+While Add Promotion / Edit Promotion was open, automatic product/category sync could
+call renderCategoryOptions(). That rebuilt the Eligible Categories checkbox list.
+Because unsaved checkbox choices only existed in the current DOM, rebuilding the list
+made every box appear unchecked.
+
+FIX
+---
+- Before category refresh, the app remembers all currently checked promo categories.
+- After rebuilding the checkbox list, those same categories are re-checked.
+- Selected-product promo checkboxes are also preserved across product/category refresh.
+- Works for both Add Promotion and Edit Promotion.
+- No need to save the promo early just to protect checkbox selections.
+
+This does not change promo pricing, cloud persistence, inventory, events, or Supabase schema.
